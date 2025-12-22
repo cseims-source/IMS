@@ -1,5 +1,3 @@
-
-
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -14,19 +12,25 @@ export default function Header({ setSidebarOpen, sidebarOpen }) {
 
   return (
     <header className="flex items-center justify-between px-6 py-3 bg-white dark:bg-gray-800 border-b dark:border-gray-700 shadow-md">
-      <div className="flex items-center gap-4">
+      <div className="flex items-center">
         <button
           onClick={() => setSidebarOpen(true)}
-          className="text-gray-500 focus:outline-none lg:hidden"
+          className="text-gray-500 focus:outline-none lg:hidden mr-4"
           aria-controls="sidebar"
           aria-expanded={sidebarOpen}
           aria-label="Open sidebar"
         >
           <Menu size={24} />
         </button>
-        <div className="flex items-center gap-3">
-          <img src="logo.jpeg" alt="Aryan Institute Logo" className="h-10 w-10 rounded" />
-          <h1 className="text-lg font-semibold text-gray-700 dark:text-gray-200">Aryan Institute</h1>
+        
+        {/* Updated Branding Section to match Landing Page style */}
+        <div className="flex flex-col">
+            <h1 className="text-2xl lg:text-3xl font-black tracking-tighter text-primary-700 dark:text-primary-400 leading-none font-serif">
+                ARYAN
+            </h1>
+            <p className="text-[0.45rem] lg:text-[0.55rem] font-extrabold tracking-[0.15em] text-primary-700 dark:text-primary-400 uppercase mt-1 leading-none">
+                Institute of Engineering & Technology
+            </p>
         </div>
       </div>
 
@@ -40,7 +44,7 @@ export default function Header({ setSidebarOpen, sidebarOpen }) {
         </button>
         <Link to={profileLink} className="flex items-center p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer">
           <UserCircle className="h-8 w-8 text-gray-600 dark:text-gray-300" />
-          <div className="ml-3 text-right">
+          <div className="ml-3 text-right hidden sm:block">
             <p className="text-sm font-medium text-gray-800 dark:text-gray-100">{user?.name || 'User'}</p>
             <p className="text-xs text-gray-500 dark:text-gray-400">{user?.role || 'Role'}</p>
           </div>
