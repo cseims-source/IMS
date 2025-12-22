@@ -1,0 +1,5 @@
+{
+  "name": "Aryan Institute of Engineering & Technology",
+  "description": "A comprehensive MERN stack application to manage all aspects of an educational institute, from student admissions and faculty management to timetables and placements. Features role-based access for Admins, Teachers, and Students.",
+  "requestFramePermissions": []
+}
