@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { GraduationCap, UserCog, User, Shield, ArrowLeft } from 'lucide-react';
+import { UserCog, User, Shield, ArrowLeft } from 'lucide-react';
 
 const RoleCard = ({ role, icon, color, path }) => (
     <Link to={path} className={`block p-8 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 ${color}`}>
@@ -23,11 +23,11 @@ export default function LoginSelection() {
 
        <div className="max-w-4xl w-full mx-auto">
         <div className="text-center mb-10">
-            <div className="flex justify-center items-center mx-auto w-20 h-20 bg-primary-600 rounded-full mb-4">
-                <GraduationCap className="w-12 h-12 text-white" />
+            <div className="flex justify-center items-center mx-auto mb-6">
+                <img src="/logo.png" alt="Aryan Logo" className="h-24 w-auto object-contain animate-float-hero" />
             </div>
-            <h1 className="text-4xl font-extrabold text-gray-900 dark:text-white">Welcome Back!</h1>
-            <p className="mt-2 text-lg text-gray-600 dark:text-gray-300">Please select your role to proceed.</p>
+            <h1 className="text-4xl font-black text-gray-900 dark:text-white uppercase tracking-tighter">Welcome Back!</h1>
+            <p className="mt-2 text-lg text-gray-600 dark:text-gray-300 font-medium">Please select your role to proceed.</p>
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
