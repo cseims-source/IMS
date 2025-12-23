@@ -15,7 +15,7 @@ export default function Header({ setSidebarOpen, sidebarOpen }) {
       <div className="flex items-center">
         <button
           onClick={() => setSidebarOpen(true)}
-          className="text-gray-500 focus:outline-none lg:hidden mr-4"
+          className="text-gray-500 focus:outline-none lg:hidden mr-6"
           aria-controls="sidebar"
           aria-expanded={sidebarOpen}
           aria-label="Open sidebar"
@@ -23,30 +23,31 @@ export default function Header({ setSidebarOpen, sidebarOpen }) {
           <Menu size={24} />
         </button>
         
-        {/* Updated Branding Section to match Landing Page style */}
-        <div className="flex flex-col">
-            <h1 className="text-2xl lg:text-3xl font-black tracking-tighter text-primary-700 dark:text-primary-400 leading-none font-serif">
-                ARYAN
-            </h1>
-            <p className="text-[0.45rem] lg:text-[0.55rem] font-extrabold tracking-[0.15em] text-primary-700 dark:text-primary-400 uppercase mt-1 leading-none">
-                Institute of Engineering & Technology
-            </p>
-        </div>
+        {/* Synchronized Internal Branding - Logo Only */}
+        <Link to="/app" className="flex items-center group">
+            <div className="flex-shrink-0 transition-transform group-hover:rotate-3 duration-500">
+                <img 
+                    src="/logo.png" 
+                    alt="AIET Logo" 
+                    className="h-12 md:h-16 w-auto object-contain" 
+                />
+            </div>
+        </Link>
       </div>
 
       <div className="flex items-center gap-4">
         <button
           onClick={toggleTheme}
-          className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none"
+          className="p-2.5 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           aria-label={theme === 'dark' ? "Switch to light mode" : "Switch to dark mode"}
         >
-          {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+          {theme === 'dark' ? <Sun size={22} /> : <Moon size={22} />}
         </button>
-        <Link to={profileLink} className="flex items-center p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer">
-          <UserCircle className="h-8 w-8 text-gray-600 dark:text-gray-300" />
+        <Link to={profileLink} className="flex items-center p-2 rounded-2xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-all cursor-pointer border border-transparent hover:border-gray-200 dark:hover:border-gray-600">
+          <UserCircle className="h-9 w-9 text-gray-600 dark:text-gray-300" />
           <div className="ml-3 text-right hidden sm:block">
-            <p className="text-sm font-medium text-gray-800 dark:text-gray-100">{user?.name || 'User'}</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">{user?.role || 'Role'}</p>
+            <p className="text-sm font-black text-gray-800 dark:text-gray-100 leading-none">{user?.name || 'User'}</p>
+            <p className="text-[0.65rem] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mt-1.5">{user?.role || 'Role'}</p>
           </div>
         </Link>
       </div>

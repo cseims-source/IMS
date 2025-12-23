@@ -35,15 +35,41 @@
     to { transform: translateY(0); opacity: 1; }
 }
 
-@keyframes slide-down {
-    from { transform: translateY(-10px); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
+@keyframes blur-in {
+    0% { filter: blur(12px); opacity: 0; transform: translateY(10px) scale(0.98); }
+    100% { filter: blur(0); opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes float-hero {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+}
+
+@keyframes text-shine {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes hero-glow {
+  0%, 100% { transform: scale(1) translate(0, 0); opacity: 0.5; }
+  33% { transform: scale(1.1) translate(20px, -20px); opacity: 0.7; }
+  66% { transform: scale(0.9) translate(-20px, 20px); opacity: 0.4; }
 }
 
 .animate-fade-in { animation: fade-in 0.3s ease-out; }
 .animate-scale-in { animation: scale-in 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
 .animate-fade-in-up { animation: fade-in-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-.animate-slide-down { animation: slide-down 0.3s ease-out forwards; }
+.animate-blur-in { animation: blur-in 1s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.animate-float-hero { animation: float-hero 6s ease-in-out infinite; }
+
+.animate-text-shine {
+  background-size: 200% auto;
+  animation: text-shine 4s linear infinite;
+}
+.animate-hero-glow {
+  animation: hero-glow 10s ease-in-out infinite;
+}
 
 /* Marquee Animation */
 @keyframes marquee {
@@ -59,40 +85,6 @@
 
 .animate-marquee:hover {
   animation-play-state: paused;
-}
-
-/* Cinematic Image Slider Animations */
-@keyframes ken-burns-in {
-  0% { transform: scale(1); }
-  100% { transform: scale(1.15); }
-}
-@keyframes ken-burns-out {
-  0% { transform: scale(1.15); }
-  100% { transform: scale(1); }
-}
-@keyframes ken-burns-right {
-  0% { transform: scale(1.1) translateX(-2%); }
-  100% { transform: scale(1.1) translateX(2%); }
-}
-@keyframes ken-burns-left {
-  0% { transform: scale(1.1) translateX(2%); }
-  100% { transform: scale(1.1) translateX(-2%); }
-}
-
-.animate-kb-in { animation: ken-burns-in 12s ease-out forwards; }
-.animate-kb-out { animation: ken-burns-out 12s ease-out forwards; }
-.animate-kb-right { animation: ken-burns-right 12s ease-out forwards; }
-.animate-kb-left { animation: ken-burns-left 12s ease-out forwards; }
-
-@keyframes laser-scan {
-  0% { transform: translateY(-100%); opacity: 0; }
-  20% { opacity: 0.5; }
-  80% { opacity: 0.5; }
-  100% { transform: translateY(400px); opacity: 0; }
-}
-
-.animate-laser {
-  animation: laser-scan 4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 
 @keyframes float-badge {

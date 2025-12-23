@@ -1,8 +1,19 @@
 import express from 'express';
 import { 
-    getStudents, getStudentsByStream, addStudent, updateStudent, deleteStudent, 
-    getStudentProfile, getStudentByIdForView, updateStudentProfilePhoto, importStudents,
-    getStudentFees, addStudentFee, updateFeeStatus, getMyFees, payMyFee,
+    getStudents, 
+    getStudentsByStream, 
+    addStudent, 
+    updateStudent, 
+    deleteStudent, 
+    getStudentProfile, 
+    getStudentByIdForView, 
+    updateStudentProfilePhoto, 
+    importStudents,
+    getStudentFees, 
+    addStudentFee, 
+    updateFeeStatus, 
+    getMyFees, 
+    payMyFee,
     getAcademicAdvice
 } from '../controllers/studentController.js';
 import { protect, admin, teacherOrAdmin, canViewStudentProfile } from '../middleware/authMiddleware.js';
@@ -15,7 +26,7 @@ router.route('/profile/photo').put(protect, updateStudentProfilePhoto);
 router.route('/profile/fees').get(protect, getMyFees);
 router.route('/profile/fees/:feeId/pay').put(protect, payMyFee);
 
-// NEW ROUTE for AI Advisor
+// Route for AI Advisor
 router.post('/academic-advisor', protect, getAcademicAdvice);
 
 
@@ -32,10 +43,9 @@ router.route('/:id')
 
 // --- Fee Management Routes ---
 router.route('/:id/fees')
-    .get(protect, admin, getStudentFees) // Admin gets fees for specific student
-    .post(protect, admin, addStudentFee); // Add fees (admin only)
+    .get(protect, admin, getStudentFees) 
+    .post(protect, admin, addStudentFee); 
 
 router.route('/:id/fees/:feeId').put(protect, admin, updateFeeStatus);
-
 
 export default router;

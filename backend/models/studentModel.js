@@ -9,7 +9,7 @@ const feeSchema = mongoose.Schema({
 
 const studentSchema = mongoose.Schema({
     firstName: { type: String, required: true },
-    lastName: { type: String, required: false }, // Made optional to support single names
+    lastName: { type: String, required: false, default: '' }, 
     email: { type: String, required: true, unique: true },
     phone: { type: String },
     dob: { type: Date },
@@ -18,7 +18,7 @@ const studentSchema = mongoose.Schema({
     stream: { type: String, default: 'Unassigned' },
     currentSemester: { type: Number, default: 1 },
     photo: { type: String },
-    fees: { type: [feeSchema], default: [] }, // Default empty array is safer
+    fees: { type: [feeSchema], default: [] },
 }, {
     timestamps: true
 });
