@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { KeyRound, ArrowLeft } from 'lucide-react';
+import { KeyRound, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import Spinner from '../../components/Spinner';
 
 export default function ResetPasswordPage() {
@@ -10,6 +10,8 @@ export default function ResetPasswordPage() {
     const { resetPassword } = useAuth();
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
@@ -57,16 +59,44 @@ export default function ResetPasswordPage() {
                             <label htmlFor="password" text-xs font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-2 ml-1>New Password</label>
                             <div className="mt-1 relative">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><KeyRound className="h-5 w-5 text-gray-400" /></div>
-                                <input id="password" name="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full p-4 pl-10 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-900 dark:text-gray-200 transition-all" />
+                                <input 
+                                    id="password" 
+                                    name="password" 
+                                    type={showPassword ? "text" : "password"} 
+                                    required 
+                                    value={password} 
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    className="w-full p-4 pl-10 pr-12 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-900 dark:text-gray-200 transition-all" 
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                                >
+                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                </button>
                             </div>
                         </div>
                         <div>
                             <label htmlFor="confirmPassword" text-xs font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-2 ml-1>Confirm Password</label>
                             <div className="mt-1 relative">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><KeyRound className="h-5 w-5 text-gray-400" /></div>
-                                <input id="confirmPassword" name="confirmPassword" type="password" required value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
-                                    className="w-full p-4 pl-10 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-900 dark:text-gray-200 transition-all" />
+                                <input 
+                                    id="confirmPassword" 
+                                    name="confirmPassword" 
+                                    type={showConfirmPassword ? "text" : "password"} 
+                                    required 
+                                    value={confirmPassword} 
+                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                    className="w-full p-4 pl-10 pr-12 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-900 dark:text-gray-200 transition-all" 
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                                >
+                                    {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                </button>
                             </div>
                         </div>
 
