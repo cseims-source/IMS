@@ -29,6 +29,7 @@ import FeesManagement from './pages/Fees/FeesManagement.jsx';
 import StudentDashboard from './pages/StudentDashboard/StudentDashboard.jsx';
 import StudentProfile from './pages/StudentProfile/StudentProfile.jsx';
 import CareerHub from './pages/CareerHub/CareerHub.jsx';
+import QuestionBank from './pages/QuestionBank/QuestionBank.jsx';
 
 import PublicLayout from './components/PublicLayout.jsx';
 import LandingPage from './pages/Landing/LandingPage.jsx';
@@ -47,7 +48,7 @@ function PrivateRoute({ children, roles }) {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return <div>Loading...</div>; // Or a spinner component
+    return <div>Loading...</div>;
   }
 
   if (!user) {
@@ -55,7 +56,6 @@ function PrivateRoute({ children, roles }) {
   }
 
   if (roles && !roles.includes(user.role)) {
-    // Redirect to a relevant dashboard or an unauthorized page
     if (user.role === 'Admin') return <Navigate to="/app/dashboard" />;
     if (user.role === 'Teacher') return <Navigate to="/app/teacher-dashboard" />;
     if (user.role === 'Student') return <Navigate to="/app/student-dashboard" />;
@@ -73,14 +73,12 @@ function App() {
           <NotificationProvider>
             <ToastContainer />
             <Routes>
-              {/* Public Routes */}
               <Route element={<PublicLayout />}>
                 <Route path="/" element={<LandingPage />} />
                 <Route path="/admission-inquiry" element={<AdmissionInquiry />} />
                 <Route path="/institute/history" element={<InstituteHistory />} />
               </Route>
 
-              {/* Auth Routes */}
               <Route path="/login" element={<LoginSelection />} />
               <Route path="/login/:role" element={<RoleLoginPage />} />
               <Route path="/register/teacher" element={<RoleRegisterPage role="Teacher" />} />
@@ -90,43 +88,37 @@ function App() {
               <Route path="/reset-password/:resettoken" element={<ResetPasswordPage />} />
 
 
-              {/* Protected Application Routes */}
               <Route path="/app" element={<PrivateRoute><Layout /></PrivateRoute>}>
-                {/* Admin Routes */}
                 <Route path="dashboard" element={<PrivateRoute roles={['Admin']}><Dashboard /></PrivateRoute>} />
                 <Route path="user-approval" element={<PrivateRoute roles={['Admin']}><UserApproval/></PrivateRoute>} />
                 <Route path="admission-requests" element={<PrivateRoute roles={['Admin']}><AdmissionRequests/></PrivateRoute>} />
-                <Route path="student-admission" element={<PrivateRoute roles={['Admin']}><StudentManager /></PrivateRoute>} />
+                <Route path="student-admission" element={<PrivateRoute roles={['Admin', 'Teacher']}><StudentManager /></PrivateRoute>} />
                 <Route path="streams" element={<PrivateRoute roles={['Admin']}><StreamManager /></PrivateRoute>} />
                 <Route path="hostel" element={<PrivateRoute roles={['Admin']}><HostelManagement /></PrivateRoute>} />
-                <Route path="library" element={<PrivateRoute roles={['Admin']}><Library /></PrivateRoute>} />
+                <Route path="library" element={<PrivateRoute roles={['Admin', 'Student']}><Library /></PrivateRoute>} />
                 <Route path="reports" element={<PrivateRoute roles={['Admin']}><ReportGenerator /></PrivateRoute>} />
                 <Route path="calendar" element={<PrivateRoute roles={['Admin', 'Student']}><EventCalendar /></PrivateRoute>} />
                 <Route path="transport" element={<PrivateRoute roles={['Admin']}><TransportManagement/></PrivateRoute>} />
                 <Route path="fees" element={<PrivateRoute roles={['Admin']}><FeesManagement /></PrivateRoute>} />
+                <Route path="question-bank" element={<PrivateRoute roles={['Admin', 'Teacher', 'Student']}><QuestionBank /></PrivateRoute>} />
 
-                {/* Teacher & Admin Routes */}
                 <Route path="faculty" element={<PrivateRoute roles={['Admin', 'Teacher']}><FacultyManager /></PrivateRoute>} />
                 <Route path="attendance" element={<PrivateRoute roles={['Admin', 'Teacher']}><AttendanceTracker /></PrivateRoute>} />
-                <Route path="marksheet" element={<PrivateRoute roles={['Admin', 'Teacher']}><MarksheetEntry /></PrivateRoute>} />
+                <Route path="marksheet" element={<PrivateRoute roles={['Admin', 'Teacher', 'Student']}><MarksheetEntry /></PrivateRoute>} />
                 <Route path="timetable" element={<PrivateRoute roles={['Admin', 'Teacher', 'Student']}><TimetableViewer /></PrivateRoute>} />
                 <Route path="student/:id" element={<PrivateRoute roles={['Admin', 'Teacher']}><ViewStudentProfile /></PrivateRoute>} />
                 
-                {/* Universal or Mixed Routes */}
                 <Route path="notice-board" element={<PrivateRoute><NoticeBoard /></PrivateRoute>} />
                 <Route path="canteen" element={<PrivateRoute><CanteenManagement /></PrivateRoute>} />
                 <Route path="placements" element={<PrivateRoute><PlacementManagement /></PrivateRoute>} />
                 <Route path="profile" element={<PrivateRoute roles={['Admin', 'Teacher']}><ProfilePage /></PrivateRoute>} />
 
-                {/* Teacher Routes */}
                 <Route path="teacher-dashboard" element={<PrivateRoute roles={['Teacher']}><TeacherDashboard /></PrivateRoute>} />
 
-                {/* Student Routes */}
                 <Route path="student-dashboard" element={<PrivateRoute roles={['Student']}><StudentDashboard /></PrivateRoute>} />
                 <Route path="my-profile" element={<PrivateRoute roles={['Student']}><StudentProfile /></PrivateRoute>} />
                 <Route path="career-hub" element={<PrivateRoute roles={['Student']}><CareerHub /></PrivateRoute>} />
                 
-                {/* Default redirect for /app */}
                 <Route index element={<DefaultDashboard />} />
               </Route>
               
@@ -138,14 +130,12 @@ function App() {
   );
 }
 
-// Helper component to redirect users based on their role when they hit "/app"
 function DefaultDashboard() {
     const { user } = useAuth();
     if (user?.role === 'Admin') return <Navigate to="/app/dashboard" />;
     if (user?.role === 'Teacher') return <Navigate to="/app/teacher-dashboard" />;
     if (user?.role === 'Student') return <Navigate to="/app/student-dashboard" />;
-    return <Navigate to="/login" />; // Fallback
+    return <Navigate to="/login" />;
 }
-
 
 export default App;

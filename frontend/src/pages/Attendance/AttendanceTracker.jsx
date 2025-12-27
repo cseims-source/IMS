@@ -1,587 +1,463 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { 
-  CheckCircle, XCircle, User, BarChart2, List, Filter, 
-  Download, Calendar, Clock, Sparkles, Loader2, 
-  CalendarCheck, ArrowRight 
-} from 'lucide-react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
-import { formatDate } from '../../utils/dateFormatter';
+import { 
+    Search, Filter, Calendar, Clock, ArrowRight, ShieldCheck, 
+    Database, Zap, ChevronDown, CheckCircle, Users, BarChart3, 
+    XCircle, Save, AlertTriangle, Sparkles
+} from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-
-const today = new Date().toISOString().split('T')[0];
-
-const TabButton = ({ active, onClick, children, icon }) => (
-    <button
-        onClick={onClick}
-        className={`flex items-center px-6 py-2.5 text-sm font-bold rounded-xl transition-all duration-300 transform active:scale-95 ${
-            active 
-            ? 'bg-primary-600 text-white shadow-lg shadow-primary-500/30' 
-            : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 border border-transparent'
-        }`}
-    >
-        {icon && <span className="mr-2">{icon}</span>}
-        {children}
-    </button>
-);
+import Spinner from '../../components/Spinner';
 
 export default function AttendanceTracker() {
-  const [activeTab, setActiveTab] = useState('mark'); // 'mark' or 'analytics'
-  const [searchParams, setSearchParams] = useSearchParams();
+  const { api } = useAuth();
+  const { addToast } = useNotification();
+  
+  const [activeMode, setActiveMode] = useState('LOG');
   const [streams, setStreams] = useState([]);
-  
-  // Selection States
-  const [selectedStream, setSelectedStream] = useState(searchParams.get('stream') || '');
-  const [selectedSemester, setSelectedSemester] = useState(searchParams.get('semester') || '');
-  const [selectedSubject, setSelectedSubject] = useState('');
-  const [selectedDate, setSelectedDate] = useState(searchParams.get('date') || today);
-  
-  // Data States
-  const [availableSubjects, setAvailableSubjects] = useState([]);
-  const [attendance, setAttendance] = useState({});
+  const [streamSubjects, setStreamSubjects] = useState([]);
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(false);
-  
-  // Analytics States
-  const [dateRange, setDateRange] = useState({ start: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0], end: today });
-  const [analyticsData, setAnalyticsData] = useState({ studentStats: [], subjectStats: [] });
+  const [saving, setSaving] = useState(false);
+  const [dailyClasses, setDailyClasses] = useState([]);
+
+  // Analytics State
+  const [analytics, setAnalytics] = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
 
-  // Teacher Specific States
-  const [teacherSchedule, setTeacherSchedule] = useState([]);
-  const [teacherProfile, setTeacherProfile] = useState(null);
+  const [formData, setFormData] = useState({
+      branch: '', 
+      semester: '1', 
+      section: 'A', 
+      subject: '',
+      date: new Date().toISOString().split('T')[0], 
+      period: 'Period 1'
+  });
 
-  const { api, user } = useAuth();
-  const { addToast } = useNotification();
-  const isTeacher = user?.role === 'Teacher';
+  const [attendanceData, setAttendanceData] = useState({});
 
-  // 0. Fetch Teacher Profile (for assigned subjects restriction)
+  // 1. Initial Load: Streams & Schedule
   useEffect(() => {
-      if (isTeacher) {
-          const fetchProfile = async () => {
-              try {
-                  const allFaculty = await api('/api/faculty');
-                  const me = allFaculty.find(f => f._id === user.profileId);
-                  setTeacherProfile(me);
-              } catch (err) {
-                  console.error("Failed to fetch teacher profile details", err);
-              }
-          };
-          fetchProfile();
-      }
-  }, [isTeacher, api, user]);
+    api('/api/streams').then(setStreams).catch(console.error);
+    fetchDailySchedule();
+  }, [api]);
 
-  // 1. Initial Load: Get Streams
+  // 2. Dynamic Subject Loading
   useEffect(() => {
-    const fetchStreams = async () => {
-      try {
-        const data = await api('/api/streams');
-        setStreams(data);
-        if (data.length > 0 && !selectedStream) {
-          setSelectedStream(data[0].name);
-        }
-      } catch (error) {
-        console.error("Failed to fetch streams", error);
-      }
-    };
-    fetchStreams();
-  }, [api, selectedStream]);
-  
-  const selectedStreamData = useMemo(() => streams.find(s => s.name === selectedStream), [streams, selectedStream]);
-
-  // 1.5 Fetch Teacher's Schedule for the selected date
-  useEffect(() => {
-      if (isTeacher && selectedDate && activeTab === 'mark') {
-          const fetchSchedule = async () => {
-              try {
-                  const data = await api(`/api/timetable/teacher/daily-schedule?date=${selectedDate}`);
-                  setTeacherSchedule(data);
-              } catch (error) {
-                  console.error("Failed to fetch teacher schedule", error);
-              }
-          };
-          fetchSchedule();
-      }
-  }, [isTeacher, selectedDate, activeTab, api]);
-
-  // 2. Stream Change: Reset/Set Semester
-  useEffect(() => {
-    if (selectedStreamData && !selectedStreamData.semesters.some(s => s.semesterNumber.toString() === selectedSemester)) {
-        if(selectedStreamData.semesters.length > 0) {
-            setSelectedSemester(selectedStreamData.semesters[0].semesterNumber.toString());
-        } else {
-            setSelectedSemester('');
-        }
-    }
-  }, [selectedStreamData, selectedSemester]);
-
-  // 3. Fetch Subjects based on Stream & Semester
-  useEffect(() => {
-      if (selectedStream && selectedSemester) {
-          const fetchSubjects = async () => {
-              try {
-                  const data = await api(`/api/streams/${encodeURIComponent(selectedStream)}/${selectedSemester}/subjects`);
-                  setAvailableSubjects(data);
-                  if (data.length > 0) {
-                      if (isTeacher && teacherProfile?.assignedSubjects?.length > 0) {
-                          const validSubject = data.find(s => teacherProfile.assignedSubjects.includes(s.name));
-                          setSelectedSubject(validSubject ? validSubject.name : data[0].name);
-                      } else {
-                          setSelectedSubject(data[0].name);
-                      }
-                  } else {
-                      setSelectedSubject('');
-                  }
-              } catch (error) {
-                  console.error("Failed to fetch subjects", error);
-              }
-          };
-          fetchSubjects();
-      }
-  }, [selectedStream, selectedSemester, api, isTeacher, teacherProfile]);
-
-  // 4. Update URL params
-  useEffect(() => {
-    const params = {};
-    if (selectedStream) params.stream = selectedStream;
-    if (selectedSemester) params.semester = selectedSemester;
-    if (selectedDate) params.date = selectedDate;
-    setSearchParams(params, { replace: true });
-  }, [selectedStream, selectedSemester, selectedDate, setSearchParams]);
-
-  // 5. MARK TAB: Fetch Students & Existing Attendance
-  useEffect(() => {
-    if (activeTab !== 'mark' || !selectedStream || !selectedSemester || !selectedDate || !selectedSubject) return;
-    
-    const fetchStudentsAndAttendance = async () => {
-      setLoading(true);
-      try {
-        // Updated to include semester filter in student fetch
-        const studentData = await api(`/api/students/stream/${encodeURIComponent(selectedStream)}?semester=${selectedSemester}`);
-        setStudents(studentData);
-
-        const attendanceData = await api(`/api/attendance/${encodeURIComponent(selectedStream)}/${selectedDate}?subject=${encodeURIComponent(selectedSubject)}&semester=${selectedSemester}`);
-        
-        const newAttendance = {};
-        if (attendanceData) {
-            attendanceData.forEach(record => {
-                if (record.student && record.student._id) {
-                    newAttendance[record.student._id] = record.status;
-                }
-            });
-        }
-        setAttendance(newAttendance);
-
-      } catch (error) {
-        console.error("Failed to fetch data:", error);
-        setStudents([]);
-        setAttendance({});
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchStudentsAndAttendance();
-  }, [selectedStream, selectedSemester, selectedDate, selectedSubject, activeTab, api]);
-
-  // 6. ANALYTICS TAB: Fetch Reports
-  useEffect(() => {
-      if (activeTab !== 'analytics' || !selectedStream || !selectedSemester) return;
-
-      const fetchAnalytics = async () => {
-          setAnalyticsLoading(true);
+      const fetchSubjects = async () => {
+          if (!formData.branch || !formData.semester) return;
           try {
-              const query = new URLSearchParams({
-                  stream: selectedStream,
-                  semester: selectedSemester,
-                  subject: selectedSubject || 'All',
-                  startDate: dateRange.start,
-                  endDate: dateRange.end
-              }).toString();
-
-              const data = await api(`/api/attendance/analytics?${query}`);
-              setAnalyticsData(data);
-          } catch (error) {
-              console.error("Failed to fetch analytics", error);
-          } finally {
-              setAnalyticsLoading(false);
+              const data = await api(`/api/streams/${encodeURIComponent(formData.branch)}/${formData.semester}/subjects`);
+              setStreamSubjects(data || []);
+              if (data?.length > 0 && !formData.subject) {
+                  setFormData(prev => ({ ...prev, subject: data[0].name }));
+              }
+          } catch (err) {
+              console.error("Subject fetch failed", err);
+              setStreamSubjects([]);
           }
       };
-      fetchAnalytics();
-  }, [activeTab, selectedStream, selectedSemester, selectedSubject, dateRange, api]);
+      fetchSubjects();
+  }, [formData.branch, formData.semester, api]);
 
+  // 3. Analytics Data Loading
+  const fetchAnalytics = useCallback(async () => {
+    setAnalyticsLoading(true);
+    try {
+        const query = `stream=${encodeURIComponent(formData.branch || 'all')}&semester=${formData.semester || 'all'}&subject=${encodeURIComponent(formData.subject || 'all')}`;
+        const data = await api(`/api/attendance/analytics?${query}`);
+        setAnalytics(data);
+    } catch (err) {
+        console.error("Analytics fetch failed", err);
+    } finally {
+        setAnalyticsLoading(false);
+    }
+  }, [api, formData.branch, formData.semester, formData.subject]);
 
-  // Handlers
-  const handleAttendanceChange = (studentId, status) => {
-    setAttendance(prev => ({
-        ...prev,
-        [studentId]: prev[studentId] === status ? null : status,
-    }));
+  useEffect(() => {
+    if (activeMode === 'ANALYTICS') fetchAnalytics();
+  }, [activeMode, fetchAnalytics]);
+
+  const fetchDailySchedule = async () => {
+      try {
+          const schedule = await api(`/api/timetable/teacher/daily-schedule?date=${formData.date}`);
+          setDailyClasses(schedule);
+      } catch (err) { console.error(err); }
   };
 
-  const markAll = (status) => {
-    const newAttendance = {};
-    students.forEach(student => {
-        newAttendance[student._id] = status;
-    });
-    setAttendance(newAttendance);
-  }
-
-  const handleSave = async () => {
-    if (!selectedSubject) {
-        addToast("Please select a subject first.", "error");
-        return;
+  const handleFetchStudents = async () => {
+    if (!formData.branch || !formData.subject) {
+        return addToast('Select Stream and Learning Module first.', 'info');
     }
+    setLoading(true);
+    try {
+        const data = await api(`/api/students/stream/${encodeURIComponent(formData.branch)}?semester=${formData.semester}`);
+        setStudents(data);
+        const initial = {};
+        data.forEach(s => initial[s._id] = null);
+        setAttendanceData(initial);
+        addToast(`Registry synced: ${data.length} student nodes identified.`, 'success');
+    } catch (err) {
+        addToast('Registry sync failed.', 'error');
+    } finally {
+        setLoading(false);
+    }
+  };
+
+  const handleStatusChange = (studentId, status) => {
+      setAttendanceData(prev => ({ ...prev, [studentId]: status }));
+  };
+
+  const handleSaveAttendance = async () => {
+    const unmarked = Object.values(attendanceData).filter(v => v === null).length;
+    if (unmarked > 0) return addToast(`${unmarked} nodes remain unmarked in sequence.`, 'error');
+
+    setSaving(true);
     try {
         await api('/api/attendance', {
             method: 'POST',
             body: JSON.stringify({
-                date: selectedDate,
-                streamName: selectedStream,
-                semester: selectedSemester,
-                subject: selectedSubject,
-                attendanceData: attendance
+                date: formData.date,
+                streamName: formData.branch,
+                semester: formData.semester,
+                subject: formData.subject,
+                attendanceData
             })
         });
-        addToast("Attendance saved successfully!", "success");
-    } catch (error) {
-        console.error("Save error:", error);
-        addToast("Failed to save attendance.", "error");
+        addToast('Registry Sequence successfully committed to node.', 'success');
+    } catch (err) {
+        addToast(err.message || 'Sequence transmission failed.', 'error');
+    } finally {
+        setSaving(false);
     }
-  }
-
-  const handleScheduleClick = (cls) => {
-      setSelectedStream(cls.stream);
-      setSelectedSemester(cls.semester.toString());
-      setSelectedSubject(cls.subject);
   };
 
-  const attendanceSummary = useMemo(() => {
-    const present = Object.values(attendance).filter(s => s === 'present').length;
-    const absent = Object.values(attendance).filter(s => s === 'absent').length;
-    const unmarked = students.length - present - absent;
-    const leaves = Object.values(attendance).filter(s => s === 'leave').length;
-    return { present, absent, unmarked, leaves };
-  }, [attendance, students]);
+  const stats = useMemo(() => {
+      const vals = Object.values(attendanceData);
+      return {
+          present: vals.filter(v => v === 'present').length,
+          absent: vals.filter(v => v === 'absent').length,
+          unmarked: vals.filter(v => v === null).length
+      };
+  }, [attendanceData]);
 
   return (
-    <div className="space-y-6 animate-fade-in">
-        <div className="flex flex-wrap justify-between items-center bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl p-4 rounded-2xl shadow-xl border border-white/20 dark:border-gray-700/30 gap-4">
-            <h1 className="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tighter flex items-center gap-3">
-                <CalendarCheck className="text-primary-600" /> Attendance <span className="text-primary-600">Hub</span>
-            </h1>
-            <div className="flex gap-2">
-                <TabButton active={activeTab === 'mark'} onClick={() => setActiveTab('mark')} icon={<CheckCircle size={18}/>}>Take Attendance</TabButton>
-                <TabButton active={activeTab === 'analytics'} onClick={() => setActiveTab('analytics')} icon={<BarChart2 size={18}/>}>View Analytics</TabButton>
+    <div className="animate-fade-in space-y-6 pb-12 max-w-[1400px] mx-auto">
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4 border-b dark:border-gray-800 pb-6">
+            <div className="flex items-center gap-8">
+                <div className="space-y-1.5">
+                    <h1 className="text-4xl font-black text-gray-900 dark:text-white uppercase tracking-tighter leading-none flex items-center gap-3">
+                        <Users className="text-primary-600 animate-float" size={32} /> 
+                        <span className="bg-clip-text text-transparent bg-gradient-to-r from-primary-600 via-secondary-500 to-indigo-500 animate-text-shine" style={{ WebkitBackgroundClip: 'text' }}>Attendance Hub</span>
+                    </h1>
+                    <p className="text-[0.65rem] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.4em] flex items-center gap-2">
+                        <Sparkles size={12} className="text-cyan-400" /> AIET Registry Gateway
+                    </p>
+                </div>
+                <div className="h-10 w-[1px] bg-gray-200 dark:bg-gray-800 hidden md:block"></div>
+                <nav className="flex gap-2 bg-gray-100 dark:bg-gray-900/50 p-1.5 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-inner">
+                    <button 
+                        onClick={() => setActiveMode('LOG')}
+                        className={`px-5 py-2.5 rounded-xl text-[0.6rem] font-black uppercase tracking-[0.2em] transition-all duration-500 flex items-center gap-2 ${activeMode === 'LOG' ? 'bg-white dark:bg-gray-800 shadow-xl text-primary-600 ring-1 ring-primary-500/20' : 'text-gray-500 hover:text-primary-400'}`}
+                    >
+                        <Zap size={14} className={activeMode === 'LOG' ? 'animate-pulse' : ''} /> Logger
+                    </button>
+                    <button 
+                        onClick={() => setActiveMode('ANALYTICS')}
+                        className={`px-5 py-2.5 rounded-xl text-[0.6rem] font-black uppercase tracking-[0.2em] transition-all duration-500 flex items-center gap-2 ${activeMode === 'ANALYTICS' ? 'bg-white dark:bg-gray-800 shadow-xl text-primary-600 ring-1 ring-primary-500/20' : 'text-gray-500 hover:text-primary-400'}`}
+                    >
+                        <BarChart3 size={14} className={activeMode === 'ANALYTICS' ? 'animate-bounce' : ''} /> Matrix
+                    </button>
+                </nav>
+            </div>
+            <div className="hidden lg:flex items-center gap-4 px-5 py-2.5 bg-primary-500/5 border border-primary-500/20 rounded-2xl shadow-sm transition-all hover:bg-primary-500/10">
+                <ShieldCheck className="text-primary-500 animate-pulse" size={20} />
+                <span className="text-[0.65rem] font-black uppercase tracking-[0.3em] text-primary-700 dark:text-primary-400">Registry Secure</span>
             </div>
         </div>
 
-        {/* --- COMMON FILTERS --- */}
-        <div className="bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-xl border border-gray-100 dark:border-gray-700/50">
-            <div className="flex flex-wrap items-end gap-6">
-                {activeTab === 'mark' ? (
-                    <div className="flex-1 min-w-[200px]">
-                        <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-2"><Calendar size={14}/> Target Date</label>
-                        <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} className="w-full p-3 border-0 bg-gray-50 dark:bg-gray-900 rounded-2xl focus:ring-2 focus:ring-primary-500 font-bold" />
+        <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-2xl border border-gray-100 dark:border-gray-700/50 overflow-hidden transform transition-all duration-500 hover:shadow-primary-500/5">
+            <div className="bg-gradient-to-r from-primary-600 via-primary-700 to-indigo-600 p-6 px-10 flex items-center justify-between gap-6 relative overflow-hidden text-white animate-fade-in">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 blur-[80px] rounded-full -mr-20 -mt-20 animate-hero-glow"></div>
+                <div className="flex items-center gap-5 relative z-10">
+                    <div className="p-3.5 bg-white/20 rounded-2xl backdrop-blur-xl border border-white/30 shadow-lg transform hover:rotate-6 transition-transform">
+                        <Filter size={22} className="text-cyan-50" />
                     </div>
-                ) : (
-                    <>
-                        <div className="flex-1 min-w-[150px]">
-                            <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">From</label>
-                            <input type="date" value={dateRange.start} onChange={e => setDateRange(prev => ({ ...prev, start: e.target.value }))} className="w-full p-3 border-0 bg-gray-50 dark:bg-gray-900 rounded-2xl focus:ring-2 focus:ring-primary-500 font-bold" />
-                        </div>
-                        <div className="flex-1 min-w-[150px]">
-                            <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">To</label>
-                            <input type="date" value={dateRange.end} onChange={e => setDateRange(prev => ({ ...prev, end: e.target.value }))} className="w-full p-3 border-0 bg-gray-50 dark:bg-gray-900 rounded-2xl focus:ring-2 focus:ring-primary-500 font-bold" />
-                        </div>
-                    </>
-                )}
-
-                <div className="flex-1 min-w-[200px]">
-                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Academic Stream</label>
-                    <select value={selectedStream} onChange={e => setSelectedStream(e.target.value)} className="w-full p-3 border-0 bg-gray-50 dark:bg-gray-900 rounded-2xl focus:ring-2 focus:ring-primary-500 font-bold">
-                        {streams.map(s => <option key={s._id} value={s.name}>{s.name}</option>)}
-                    </select>
+                    <div>
+                        <h2 className="text-2xl font-black uppercase tracking-tighter text-cyan-50">Filter Node</h2>
+                        <p className="text-primary-100 text-[0.6rem] font-black uppercase tracking-[0.4em] mt-1 flex items-center gap-2">
+                            <Database size={12} className="text-cyan-300" /> Active Registry Query
+                        </p>
+                    </div>
                 </div>
-                <div className="flex-1 min-w-[120px]">
-                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Semester</label>
-                    <select value={selectedSemester} onChange={e => setSelectedSemester(e.target.value)} className="w-full p-3 border-0 bg-gray-50 dark:bg-gray-900 rounded-2xl focus:ring-2 focus:ring-primary-500 font-bold" disabled={!selectedStreamData}>
-                        {selectedStreamData?.semesters.map(s => <option key={s._id} value={s.semesterNumber}>{s.semesterNumber}</option>)}
-                    </select>
-                </div>
-                <div className="flex-[2] min-w-[250px]">
-                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-2"><List size={14}/> Subject Allocation</label>
-                    <select value={selectedSubject} onChange={e => setSelectedSubject(e.target.value)} className="w-full p-3 border-0 bg-gray-50 dark:bg-gray-900 rounded-2xl focus:ring-2 focus:ring-primary-500 font-bold">
-                        {activeTab === 'analytics' && <option value="All">All Subjects (Aggregate)</option>}
-                        {availableSubjects
-                            .filter(s => {
-                                if (activeTab === 'mark' && isTeacher && teacherProfile?.assignedSubjects?.length > 0) {
-                                    return teacherProfile.assignedSubjects.includes(s.name);
-                                }
-                                return true;
-                            })
-                            .map(s => <option key={s._id} value={s.name}>{s.name} ({s.code})</option>)
-                        }
-                    </select>
+                <div className="text-[0.6rem] font-black uppercase tracking-[0.5em] text-cyan-100/60 flex items-center gap-3 relative z-10">
+                   <div className="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></div> Live Link Active
                 </div>
             </div>
             
-            {/* TEACHER SCHEDULE SECTION */}
-            {isTeacher && activeTab === 'mark' && (
-                <div className="mt-8 pt-8 border-t dark:border-gray-700/50">
-                    <h3 className="text-xs font-black text-gray-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-3">
-                        <Sparkles size={16} className="text-primary-500 animate-pulse"/> Suggested from your Daily Timetable
-                    </h3>
-                    {teacherSchedule.length > 0 ? (
-                        <div className="flex flex-wrap gap-4">
-                            {teacherSchedule.map((cls, idx) => (
-                                <button
-                                    key={idx}
-                                    onClick={() => handleScheduleClick(cls)}
-                                    className={`flex items-center p-4 rounded-[1.5rem] border-2 transition-all duration-500 transform hover:-translate-y-1 ${
-                                        selectedStream === cls.stream && selectedSemester === cls.semester.toString() && selectedSubject === cls.subject
-                                        ? 'bg-primary-600 border-primary-500 text-white shadow-xl shadow-primary-500/20'
-                                        : 'bg-white border-gray-100 hover:border-primary-300 dark:bg-gray-900 dark:border-gray-800'
-                                    }`}
+            <div className="p-8">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-5 mb-8">
+                    {[
+                        { label: 'Stream Node', name: 'branch', options: streams.map(s => s.name) },
+                        { label: 'Academic Sem', name: 'semester', options: [1,2,3,4,5,6,7,8] },
+                        { label: 'Section Node', name: 'section', options: ['A', 'B', 'C'] },
+                        { label: 'Core Module', name: 'subject', options: streamSubjects.map(s => s.name) },
+                        { label: 'Time Slot', name: 'period', options: ['Period 1', 'Period 2', 'Period 3', 'Period 4'] }
+                    ].map(field => (
+                        <div key={field.label} className="space-y-2">
+                            <label className="text-[0.6rem] font-black uppercase tracking-[0.3em] text-gray-500 dark:text-gray-400 ml-1 flex items-center gap-2">
+                                {field.label}
+                            </label>
+                            <div className="relative group">
+                                <select 
+                                    name={field.name}
+                                    value={formData[field.name]}
+                                    onChange={(e) => setFormData(p => ({...p, [e.target.name]: e.target.value}))}
+                                    className="w-full p-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-700 rounded-xl text-[0.7rem] font-black uppercase tracking-tight focus:ring-4 focus:ring-primary-500/10 appearance-none cursor-pointer pr-10 transition-all"
                                 >
-                                    <div className="text-left">
-                                        <div className={`text-[0.6rem] font-black uppercase tracking-widest mb-1 ${selectedStream === cls.stream && selectedSemester === cls.semester.toString() && selectedSubject === cls.subject ? 'text-primary-100' : 'text-primary-600'}`}>{cls.time}</div>
-                                        <div className="text-sm font-black">{cls.subject}</div>
-                                        <div className={`text-[0.7rem] font-bold opacity-70`}>{cls.stream} • Sem {cls.semester}</div>
-                                    </div>
-                                </button>
-                            ))}
+                                    <option value="" className="text-gray-400">Select</option>
+                                    {field.options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                </select>
+                                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none group-hover:text-primary-500 transition-colors" size={14} />
+                            </div>
                         </div>
-                    ) : (
-                        <div className="p-6 bg-gray-50 dark:bg-gray-900/50 rounded-2xl border border-dashed dark:border-gray-800 text-center">
-                            <p className="text-sm text-gray-400 font-bold uppercase tracking-widest">No classes synced for this date</p>
+                    ))}
+                    <div className="space-y-2">
+                        <label className="text-[0.6rem] font-black uppercase tracking-[0.3em] text-gray-500 dark:text-gray-400 ml-1">Registry Date</label>
+                        <div className="relative">
+                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-primary-500" size={16} />
+                            <input 
+                                type="date" 
+                                name="date"
+                                value={formData.date} 
+                                onChange={(e) => setFormData(p => ({...p, date: e.target.value}))}
+                                className="w-full p-2.5 pl-10 bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-700 rounded-xl text-[0.7rem] font-black focus:ring-4 focus:ring-primary-500/10 transition-all cursor-pointer" 
+                            />
                         </div>
-                    )}
-                </div>
-            )}
-        </div>
-
-        {/* --- MARK ATTENDANCE CONTENT --- */}
-        {activeTab === 'mark' && (
-            <div className="bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-xl border border-gray-100 dark:border-gray-700/50 relative overflow-hidden">
-                {/* Decorative background element */}
-                <div className="absolute top-0 right-0 w-64 h-64 bg-primary-500/5 blur-[100px] rounded-full -mr-32 -mt-32"></div>
-
-                <div className="flex flex-wrap justify-between items-center mb-8 gap-4 relative z-10">
-                    <div className="space-y-1">
-                        <h2 className="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tighter">
-                            Active Student Roster
-                        </h2>
-                        <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">
-                            Filtering for {selectedStream} • Semester {selectedSemester}
-                        </p>
-                    </div>
-                    <div className="flex gap-3">
-                        <button onClick={() => markAll('present')} className="px-5 py-2.5 bg-green-500/10 text-green-600 text-xs font-black uppercase tracking-widest rounded-xl hover:bg-green-600 hover:text-white transition-all duration-300">Mark All Present</button>
-                        <button onClick={() => markAll('absent')} className="px-5 py-2.5 bg-red-500/10 text-red-600 text-xs font-black uppercase tracking-widest rounded-xl hover:bg-red-600 hover:text-white transition-all duration-300">Mark All Absent</button>
                     </div>
                 </div>
 
-                {loading ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                        {[1,2,3,4,5,6,7,8].map(i => (
-                            <div key={i} className="h-44 bg-gray-100 dark:bg-gray-900 rounded-3xl animate-pulse"></div>
-                        ))}
-                    </div>
-                ) : students.length === 0 ? (
-                    <div className="text-center py-20 bg-gray-50 dark:bg-gray-900/50 rounded-[2.5rem] border-2 border-dashed dark:border-gray-800">
-                        <div className="flex flex-col items-center gap-4">
-                            <User size={48} className="text-gray-300" />
-                            <p className="text-gray-500 font-bold uppercase tracking-widest">No students found in {selectedStream} Sem {selectedSemester}</p>
-                        </div>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 relative z-10">
-                        {students.map((student, idx) => {
-                            const status = attendance[student._id];
-                            let cardClass = 'bg-white border-gray-100 dark:bg-gray-900 dark:border-gray-800';
-                            let glowClass = '';
-
-                            if (status === 'present') {
-                                cardClass = 'bg-green-50/50 border-green-500/50 dark:bg-green-950/20 dark:border-green-500/30';
-                                glowClass = 'shadow-[0_0_20px_rgba(34,197,94,0.15)]';
-                            }
-                            if (status === 'absent') {
-                                cardClass = 'bg-red-50/50 border-red-500/50 dark:bg-red-950/20 dark:border-red-500/30';
-                                glowClass = 'shadow-[0_0_20px_rgba(239,68,68,0.15)]';
-                            }
-                            if (status === 'leave') {
-                                cardClass = 'bg-yellow-50/50 border-yellow-500/50 dark:bg-yellow-950/20 dark:border-yellow-500/30';
-                                glowClass = 'shadow-[0_0_20px_rgba(234,179,8,0.15)]';
-                            }
-
-                            return (
-                                <div 
-                                    key={student._id} 
-                                    className={`p-6 border-2 rounded-[2rem] transition-all duration-500 animate-fade-in-up ${cardClass} ${glowClass}`}
-                                    style={{ animationDelay: `${idx * 50}ms` }}
-                                >
-                                    <div className="flex items-center mb-5">
-                                        <div className="relative group">
-                                            <div className="absolute -inset-1 bg-gradient-to-tr from-primary-500 to-purple-500 rounded-2xl blur opacity-0 group-hover:opacity-40 transition duration-500"></div>
-                                            <div className="relative h-14 w-14 rounded-2xl bg-gray-200 dark:bg-gray-800 overflow-hidden shadow-inner">
-                                                <img src={student.photo || `https://api.dicebear.com/8.x/initials/svg?seed=${student.firstName}`} alt={student.firstName} className="h-full w-full object-cover"/>
-                                            </div>
-                                        </div>
-                                        <div className="ml-4 overflow-hidden">
-                                            <p className="font-black text-gray-900 dark:text-white truncate text-base leading-tight">{student.firstName} {student.lastName}</p>
-                                            <p className="text-[0.6rem] font-black text-gray-400 uppercase tracking-widest mt-1">ID: {student._id.slice(-6).toUpperCase()}</p>
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-3 gap-2">
-                                        <button onClick={() => handleAttendanceChange(student._id, 'present')} className={`flex items-center justify-center py-2 text-[0.65rem] font-black uppercase tracking-widest rounded-xl transition-all duration-300 ${status === 'present' ? 'bg-green-600 text-white shadow-lg shadow-green-500/40' : 'bg-gray-100 dark:bg-gray-800 text-gray-500 hover:bg-green-50 dark:hover:bg-green-900/30'}`}>
-                                            P
-                                        </button>
-                                        <button onClick={() => handleAttendanceChange(student._id, 'absent')} className={`flex items-center justify-center py-2 text-[0.65rem] font-black uppercase tracking-widest rounded-xl transition-all duration-300 ${status === 'absent' ? 'bg-red-600 text-white shadow-lg shadow-red-500/40' : 'bg-gray-100 dark:bg-gray-800 text-gray-500 hover:bg-red-50 dark:hover:bg-red-900/30'}`}>
-                                            A
-                                        </button>
-                                        <button onClick={() => handleAttendanceChange(student._id, 'leave')} className={`flex items-center justify-center py-2 text-[0.65rem] font-black uppercase tracking-widest rounded-xl transition-all duration-300 ${status === 'leave' ? 'bg-yellow-500 text-white shadow-lg shadow-yellow-500/40' : 'bg-gray-100 dark:bg-gray-800 text-gray-500 hover:bg-yellow-50 dark:hover:bg-yellow-900/30'}`}>
-                                            L
-                                        </button>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
-
-                <div className="mt-12 pt-8 border-t-2 border-dashed border-gray-100 dark:border-gray-800 flex flex-col md:flex-row justify-between items-center gap-6 relative z-10">
-                    <div className="flex flex-wrap gap-6 text-[0.7rem] font-black uppercase tracking-[0.2em]">
-                        <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                            <span className="text-green-600">{attendanceSummary.present} Present</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                            <span className="text-red-600">{attendanceSummary.absent} Absent</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
-                            <span className="text-yellow-600">{attendanceSummary.leaves} Leave</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-gray-400">
-                             <span className="opacity-50">{attendanceSummary.unmarked} Unmarked</span>
-                        </div>
+                <div className="flex flex-col md:flex-row justify-between items-center border-t dark:border-gray-700 pt-6 gap-6">
+                    <div className="flex flex-wrap items-center gap-3">
+                        <span className="text-[0.6rem] font-black uppercase tracking-[0.4em] text-indigo-500 flex items-center gap-2">
+                            <Clock size={12} className="animate-spin-slow" /> Timetable Sync:
+                        </span>
+                        {dailyClasses.length > 0 ? dailyClasses.slice(0, 2).map((c, i) => (
+                            <button 
+                                key={i} 
+                                onClick={() => setFormData(p => ({...p, branch: c.stream, subject: c.subject, semester: c.semester.toString()}))}
+                                className="px-4 py-1.5 bg-primary-600/10 text-primary-700 dark:text-primary-300 text-[0.6rem] font-black rounded-xl border border-primary-500/30 hover:bg-primary-700 hover:text-white hover:shadow-[0_0_20px_rgba(79,70,229,0.3)] transition-all duration-300 uppercase tracking-widest active:scale-95"
+                            >
+                                {c.time}: {c.subject}
+                            </button>
+                        )) : <span className="text-[0.55rem] font-black text-gray-300 uppercase tracking-[0.5em] italic">Scheduler Scanning...</span>}
                     </div>
                     <button 
-                        onClick={handleSave} 
-                        disabled={students.length === 0}
-                        className="w-full md:w-auto px-12 py-4 bg-primary-600 text-white text-sm font-black uppercase tracking-widest rounded-2xl hover:bg-primary-700 shadow-2xl shadow-primary-500/40 transition-all duration-300 transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed group flex items-center justify-center gap-3"
+                        onClick={handleFetchStudents} 
+                        disabled={loading} 
+                        className="group flex items-center px-8 py-3 bg-primary-600 text-white rounded-[1.5rem] font-black uppercase text-[0.65rem] tracking-[0.3em] hover:bg-primary-700 hover:shadow-[0_0_25px_rgba(79,70,229,0.4)] transition shadow-xl shadow-primary-500/20 active:scale-95 disabled:opacity-50 relative overflow-hidden"
                     >
-                        Save Session Record <ArrowRight size={18} className="group-hover:translate-x-2 transition-transform"/>
+                        {loading ? <Spinner size="sm" className="mr-3"/> : <Zap size={16} className="mr-3 group-hover:scale-125 transition-transform" />} 
+                        <span className="relative z-10">Start Log Sequence</span>
                     </button>
                 </div>
             </div>
-        )}
+        </div>
 
-        {/* --- ANALYTICS TAB CONTENT --- */}
-        {activeTab === 'analytics' && (
-            <div className="space-y-6 animate-fade-in">
-                {/* Charts Row */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] shadow-xl border border-gray-100 dark:border-gray-700/50">
-                        <h3 className="text-lg font-black text-gray-900 dark:text-white mb-6 uppercase tracking-tighter">Subject Attendance Matrix</h3>
-                        <div className="h-72">
-                            {analyticsData.subjectStats.length > 0 ? (
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={analyticsData.subjectStats} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                        <XAxis dataKey="subject" fontSize={10} axisLine={false} tickLine={false} fontStyle="bold" />
-                                        <YAxis domain={[0, 100]} axisLine={false} tickLine={false} fontSize={10} />
-                                        <Tooltip cursor={{ fill: 'rgba(34,197,94,0.05)' }} contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }} />
-                                        <Bar dataKey="percentage" fill="#22c55e" name="Attendance %" radius={[10, 10, 0, 0]}>
-                                            {analyticsData.subjectStats.map((entry, index) => (
-                                                <Cell key={`cell-${index}`} fill={entry.percentage < 75 ? '#ef4444' : '#22c55e'} />
-                                            ))}
-                                        </Bar>
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            ) : (
-                                <div className="h-full flex flex-col items-center justify-center text-gray-400 gap-3">
-                                    <BarChart2 size={48} className="opacity-20" />
-                                    <p className="font-bold uppercase tracking-widest text-xs">Awaiting data matrix...</p>
+        {activeMode === 'LOG' ? (
+            students.length > 0 ? (
+                <div className="bg-white dark:bg-gray-800 rounded-[3rem] shadow-2xl border border-gray-100 dark:border-gray-700/50 p-10 animate-scale-in">
+                    <div className="flex flex-col md:flex-row justify-between items-end mb-10 gap-4 border-l-4 border-cyan-500 pl-6">
+                        <div className="space-y-1.5">
+                            <h3 className="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tighter flex items-center gap-3">
+                                Roster <span className="text-primary-600">Active</span>
+                            </h3>
+                            <p className="text-[0.7rem] font-black text-gray-500 uppercase tracking-[0.4em]">
+                                Commit protocol for <span className="text-primary-600 font-black">{formData.subject}</span>
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-12">
+                        {students.map((student) => (
+                            <div key={student._id} className={`p-6 rounded-[2rem] border transition-all duration-500 relative group overflow-hidden ${attendanceData[student._id] ? 'bg-white dark:bg-gray-800 border-primary-500/40 shadow-2xl' : 'bg-gray-50/50 dark:bg-gray-900/50 border-gray-100 dark:border-gray-800'}`}>
+                                <div className={`absolute top-0 left-0 w-2 h-full transition-all duration-500 ${attendanceData[student._id] === 'present' ? 'bg-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.5)]' : attendanceData[student._id] === 'absent' ? 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.5)]' : 'bg-transparent'}`}></div>
+                                
+                                <div className="flex items-center gap-5 mb-6 text-gray-900 dark:text-white">
+                                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-xs transition-all duration-500 ${attendanceData[student._id] === 'present' ? 'bg-cyan-100 text-cyan-700 shadow-inner' : 'bg-gray-200 dark:bg-gray-700 text-gray-500'}`}>
+                                        {student.firstName[0]}{student.lastName?.[0]}
+                                    </div>
+                                    <div>
+                                        <h4 className="text-sm font-black uppercase tracking-tight leading-none mb-1">{student.firstName} {student.lastName}</h4>
+                                        <p className="text-[0.6rem] text-gray-400 font-black uppercase tracking-widest flex items-center gap-1.5">
+                                            <Database size={10} className="text-primary-400" /> ID-{student._id.slice(-6).toUpperCase()}
+                                        </p>
+                                    </div>
                                 </div>
-                            )}
-                        </div>
-                    </div>
-                    
-                    <div className="bg-primary-600 p-8 rounded-[2.5rem] shadow-xl text-white relative overflow-hidden flex flex-col justify-center">
-                        <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 blur-[80px] rounded-full -mr-32 -mt-32"></div>
-                        <h3 className="text-lg font-black mb-8 uppercase tracking-tighter relative z-10 flex items-center gap-3">
-                            <Sparkles size={20}/> Insights Overview
-                        </h3>
-                        <div className="grid grid-cols-2 gap-6 relative z-10">
-                            <div className="p-6 bg-white/10 backdrop-blur-md rounded-3xl border border-white/20">
-                                <p className="text-4xl font-black mb-1">{analyticsData.studentStats.length}</p>
-                                <p className="text-[0.6rem] font-bold uppercase tracking-[0.2em] opacity-70">Enrolled Minds</p>
-                            </div>
-                            <div className="p-6 bg-red-500/20 backdrop-blur-md rounded-3xl border border-red-400/30">
-                                <p className="text-4xl font-black mb-1 text-red-200">
-                                    {analyticsData.studentStats.filter(s => s.percentage < 75).length}
-                                </p>
-                                <p className="text-[0.6rem] font-bold uppercase tracking-[0.2em] opacity-70">Defaulter Alert</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
 
-                {/* Detailed Table */}
-                <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] shadow-xl border border-gray-100 dark:border-gray-700/50">
-                    <h3 className="text-lg font-black text-gray-900 dark:text-white mb-6 uppercase tracking-tighter flex items-center gap-3">
-                        <List size={20} className="text-primary-500" /> Detailed Performance Registry
-                    </h3>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left border-separate border-spacing-y-3">
-                            <thead>
-                                <tr className="text-gray-400 text-[0.65rem] font-black uppercase tracking-widest">
-                                    <th className="px-6 py-4">Intellectual Profile</th>
-                                    <th className="px-6 py-4 text-center">Sessions</th>
-                                    <th className="px-6 py-4 text-center">Presence</th>
-                                    <th className="px-6 py-4 text-center">Excused</th>
-                                    <th className="px-6 py-4 text-center">Score</th>
-                                    <th className="px-6 py-4 text-center">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {analyticsLoading ? (
-                                    <tr><td colSpan="6" className="p-12 text-center">
-                                        <Loader2 className="animate-spin h-10 w-10 mx-auto text-primary-500" />
-                                    </td></tr>
-                                ) : analyticsData.studentStats.length === 0 ? (
-                                    <tr><td colSpan="6" className="p-12 text-center text-gray-500 font-bold uppercase tracking-widest">No matching registry records</td></tr>
-                                ) : (
-                                    analyticsData.studentStats.map(stat => (
-                                        <tr key={stat._id} className="bg-gray-50/50 dark:bg-gray-900/50 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-all duration-300 transform hover:scale-[1.01]">
-                                            <td className="px-6 py-4 rounded-l-2xl">
-                                                <div className="font-black text-gray-900 dark:text-white">{stat.name}</div>
-                                                <div className="text-[0.6rem] font-bold text-gray-400 uppercase tracking-widest">UID: {stat._id.slice(-6)}</div>
-                                            </td>
-                                            <td className="px-6 py-4 text-center font-bold text-gray-600 dark:text-gray-400">{stat.totalClasses}</td>
-                                            <td className="px-6 py-4 text-center font-bold text-green-600">{stat.presentClasses}</td>
-                                            <td className="px-6 py-4 text-center font-bold text-yellow-600">{stat.leaveClasses || 0}</td>
-                                            <td className="px-6 py-4 text-center">
-                                                <div className={`text-lg font-black ${stat.percentage >= 75 ? 'text-primary-600' : 'text-red-600'}`}>
-                                                    {stat.percentage.toFixed(1)}%
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 text-center rounded-r-2xl">
-                                                <span className={`px-4 py-1.5 text-[0.6rem] font-black uppercase tracking-widest rounded-full ${stat.percentage >= 75 ? 'bg-green-100 text-green-700 dark:bg-green-900/30' : 'bg-red-100 text-red-700 dark:bg-red-900/30'}`}>
-                                                    {stat.percentage >= 75 ? 'Exemplary' : 'Warning'}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
+                                <div className="flex gap-2">
+                                    <button 
+                                        onClick={() => handleStatusChange(student._id, 'present')} 
+                                        className={`flex-1 py-2.5 rounded-xl text-[0.7rem] font-black uppercase transition-all duration-500 border ${attendanceData[student._id] === 'present' ? 'bg-gradient-to-br from-cyan-500 to-cyan-600 text-white border-transparent shadow-[0_0_20px_rgba(6,182,212,0.5)] scale-105 rotate-1 animate-scale-in' : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 text-gray-500 hover:border-cyan-400 hover:text-cyan-500'}`}
+                                    >
+                                        P
+                                    </button>
+                                    <button 
+                                        onClick={() => handleStatusChange(student._id, 'absent')} 
+                                        className={`flex-1 py-2.5 rounded-xl text-[0.7rem] font-black uppercase transition-all duration-500 border ${attendanceData[student._id] === 'absent' ? 'bg-gradient-to-br from-red-500 to-red-600 text-white border-transparent shadow-[0_0_20px_rgba(239,68,68,0.5)] scale-105 -rotate-1 animate-scale-in' : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 text-gray-500 hover:border-red-400 hover:text-red-500'}`}
+                                    >
+                                        A
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="bg-gray-50 dark:bg-gray-900/50 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 flex flex-wrap items-center justify-between gap-10">
+                        <div className="flex items-center gap-12">
+                            <div className="flex items-center gap-3">
+                                <div className="w-3 h-3 rounded-full bg-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.5)]"></div>
+                                <span className="text-[0.7rem] font-black text-gray-900 dark:text-gray-200 uppercase tracking-[0.2em]">{stats.present} Present</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <div className="w-3 h-3 rounded-full bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]"></div>
+                                <span className="text-[0.7rem] font-black text-gray-900 dark:text-gray-200 uppercase tracking-[0.2em]">{stats.absent} Absent</span>
+                            </div>
+                            <div className="text-[0.7rem] font-black text-primary-600 uppercase tracking-[0.4em] animate-pulse">
+                                {stats.unmarked} Node Commits Remaining
+                            </div>
+                        </div>
+                        <button 
+                            onClick={handleSaveAttendance} 
+                            disabled={saving || stats.unmarked > 0} 
+                            className="group flex items-center px-10 py-3.5 bg-primary-600 text-white rounded-[1.5rem] font-black uppercase text-[0.7rem] tracking-[0.3em] hover:bg-primary-700 hover:shadow-[0_0_20px_rgba(79,70,229,0.3)] transition shadow-2xl shadow-primary-500/30 active:scale-95 disabled:bg-gray-300 dark:disabled:bg-gray-800"
+                        >
+                            {saving ? <Spinner size="sm" className="mr-3"/> : <Save size={18} className="mr-3 group-hover:rotate-12 transition-transform" />} 
+                            <span className="relative z-10">Commit Records</span>
+                        </button>
                     </div>
                 </div>
+            ) : (
+                <div className="text-center py-24 bg-white dark:bg-gray-800 rounded-[4rem] border-2 border-dashed border-gray-100 dark:border-gray-800/50 shadow-inner group">
+                    <div className="p-10 bg-primary-50 dark:bg-primary-900/20 inline-block rounded-[3rem] mb-8 transition-transform duration-700 group-hover:rotate-12 group-hover:scale-110 shadow-sm">
+                        <AlertTriangle className="text-primary-300 dark:text-primary-700" size={64} />
+                    </div>
+                    <p className="text-[0.8rem] font-black uppercase tracking-[0.5em] text-gray-400 dark:text-gray-600">Initialize sequence parameters to view roster</p>
+                </div>
+            )
+        ) : (
+            <div className="space-y-8 animate-fade-in-up">
+                {analyticsLoading ? (
+                    <div className="text-center py-24 flex flex-col items-center gap-6 bg-white dark:bg-gray-800 rounded-[3rem] shadow-xl">
+                        <Spinner size="lg" />
+                        <p className="font-black uppercase text-[0.8rem] tracking-[0.5em] text-gray-400 animate-pulse">Aggregating Matrix Nodes...</p>
+                    </div>
+                ) : analytics ? (
+                    <>
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                            <div className="lg:col-span-2 bg-white dark:bg-gray-800 p-10 rounded-[3rem] shadow-2xl border border-gray-100 dark:border-gray-700/50">
+                                <h3 className="text-2xl font-black uppercase tracking-tighter text-gray-900 dark:text-white mb-10">Subject Participation Matrix</h3>
+                                <div className="h-[320px]">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={analytics.subjectStats}>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eee" className="dark:stroke-gray-700" />
+                                            <XAxis dataKey="subject" fontSize={10} axisLine={false} tickLine={false} />
+                                            <YAxis domain={[0, 100]} fontSize={10} axisLine={false} tickLine={false} />
+                                            <Tooltip 
+                                                cursor={{fill: 'rgba(79, 70, 229, 0.05)'}} 
+                                                contentStyle={{ borderRadius: '1.5rem', border: 'none', background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(10px)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.15)', fontSize: '11px', fontWeight: '900' }} 
+                                            />
+                                            <Bar dataKey="percentage" radius={[12, 12, 0, 0]} barSize={40}>
+                                                {analytics.subjectStats.map((e, i) => <Cell key={i} fill={i % 2 === 0 ? '#4f46e5' : '#06b6d4'} className="transition-all hover:opacity-80" />)}
+                                            </Bar>
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+
+                            <div className="space-y-6">
+                                {[
+                                    { label: 'Total Enrolled Nodes', value: analytics.summary.totalEnrolled, color: 'text-primary-600', icon: <Users />, bg: 'bg-primary-50/50' },
+                                    { label: 'Node Participation', value: analytics.summary.avgAttendance + '%', color: 'text-cyan-600', icon: <BarChart3 />, bg: 'bg-cyan-50/50' },
+                                    { label: 'Defaulter Nodes', value: analytics.summary.defaulters, color: 'text-red-500', icon: <XCircle />, bg: 'bg-red-50/50' }
+                                ].map((stat, i) => (
+                                    <div key={i} className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] shadow-xl border border-gray-100 dark:border-gray-700/50 flex items-center justify-between group hover:-translate-y-2 transition-all duration-500 relative overflow-hidden">
+                                        <div className={`absolute top-0 right-0 w-32 h-32 ${stat.bg} blur-[60px] rounded-full -mr-16 -mt-16 opacity-0 group-hover:opacity-100 transition-opacity`}></div>
+                                        <div className="relative z-10">
+                                            <p className="text-[0.65rem] font-black text-gray-500 dark:text-gray-400 uppercase tracking-[0.3em] mb-2">{stat.label}</p>
+                                            <p className={`text-4xl font-black ${stat.color} tracking-tighter`}>{stat.value}</p>
+                                        </div>
+                                        <div className={`p-4 ${stat.bg} dark:bg-gray-900 rounded-2xl group-hover:scale-125 group-hover:rotate-12 transition-all duration-500 relative z-10 shadow-sm`}>
+                                            {React.cloneElement(stat.icon, { size: 28, className: stat.color })}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="bg-white dark:bg-gray-800 rounded-[3rem] shadow-2xl border border-gray-100 dark:border-gray-700/50 overflow-hidden animate-slide-up">
+                            <div className="p-8 border-b dark:border-gray-700 flex flex-col md:flex-row justify-between items-center gap-6 bg-gray-50/50 dark:bg-gray-900/20">
+                                <h3 className="text-2xl font-black uppercase tracking-tighter text-gray-900 dark:text-white">Performance Registry Matrix</h3>
+                                <div className="relative group">
+                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary-500 transition-colors" size={16} />
+                                    <input type="text" placeholder="Identity lookup..." className="pl-12 pr-6 py-3 bg-white dark:bg-gray-900 border-0 rounded-2xl text-[0.7rem] font-black uppercase w-64 shadow-xl focus:ring-4 focus:ring-primary-500/10" />
+                                </div>
+                            </div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left">
+                                    <thead className="bg-gray-50 dark:bg-gray-900/50">
+                                        <tr className="text-[0.7rem] font-black uppercase tracking-[0.3em] text-gray-600 dark:text-gray-400">
+                                            <th className="p-6 pl-10">Student Node Identity</th>
+                                            <th className="p-6 text-gray-700 dark:text-gray-300">Logged Sessions</th>
+                                            <th className="p-6 text-gray-700 dark:text-gray-300">Participation Score</th>
+                                            <th className="p-6 pr-10 text-gray-700 dark:text-gray-300">Logic Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="text-[0.75rem]">
+                                        {analytics.studentStats.map(row => (
+                                            <tr key={row.roll} className="border-b dark:border-gray-700/50 hover:bg-primary-50/20 dark:hover:bg-primary-900/10 transition-all group">
+                                                <td className="p-6 pl-10">
+                                                    <div className="flex items-center gap-5">
+                                                        <div className="w-11 h-11 rounded-2xl bg-primary-100 dark:bg-primary-900/50 flex items-center justify-center font-black text-primary-600 uppercase text-xs shadow-inner">
+                                                            {row.name.split(' ').map(n => n[0]).join('')}
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-black text-gray-900 dark:text-white uppercase tracking-tight text-sm mb-1">{row.name}</p>
+                                                            <p className="text-[0.6rem] text-gray-500 font-black uppercase tracking-widest flex items-center gap-2">
+                                                                <Database size={10} className="text-primary-300" /> UID-{row.roll.slice(-4).toUpperCase()}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="p-6 font-black text-gray-800 dark:text-gray-200 text-base">{row.present} <span className="text-gray-400 font-medium">/ {row.total}</span></td>
+                                                <td className="p-6">
+                                                    <div className="flex items-center gap-5">
+                                                        <div className="flex-grow w-32 h-2.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden shadow-inner p-0.5">
+                                                            <div className={`h-full rounded-full transition-all duration-1000 ${row.percentage >= 75 ? 'bg-gradient-to-r from-cyan-500 to-primary-500 shadow-[0_0_10px_rgba(6,182,212,0.3)]' : 'bg-red-500'}`} style={{ width: `${row.percentage}%` }}></div>
+                                                        </div>
+                                                        <span className={`font-black text-sm w-12 text-right ${row.percentage >= 75 ? 'text-primary-600' : 'text-red-500'}`}>{row.percentage.toFixed(0)}%</span>
+                                                    </div>
+                                                </td>
+                                                <td className="p-6 pr-10">
+                                                    <span className={`px-4 py-1.5 rounded-xl text-[0.65rem] font-black uppercase tracking-[0.2em] shadow-sm ${row.percentage >= 75 ? 'bg-primary-500/10 text-primary-600 border border-primary-500/20' : 'bg-red-500/10 text-red-600 border border-red-500/20'}`}>
+                                                        {row.percentage >= 75 ? 'Optimal' : 'Flagged'}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </>
+                ) : (
+                    <div className="text-center py-32 bg-white dark:bg-gray-800 rounded-[4rem] border-2 border-dashed border-gray-100 dark:border-gray-800/50 shadow-inner">
+                        <div className="mb-8 p-10 bg-primary-50 dark:bg-primary-900/20 inline-block rounded-full">
+                            <BarChart3 className="text-primary-200 dark:text-primary-800" size={80} />
+                        </div>
+                        <p className="text-[0.9rem] font-black uppercase tracking-[0.6em] text-gray-500 dark:text-gray-400">Initialize sequence parameters to generate matrix</p>
+                    </div>
+                )}
             </div>
         )}
     </div>

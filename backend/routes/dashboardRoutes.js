@@ -1,9 +1,19 @@
-
 import express from 'express';
-import { getDashboardStats, getTeacherDashboardStats, getDashboardCharts, getStudentDashboardSummary, getTeacherInsights, generateQuiz } from '../controllers/dashboardController.js';
+import { 
+    getDashboardStats, 
+    getTeacherDashboardStats, 
+    getDashboardCharts, 
+    getStudentDashboardSummary, 
+    getTeacherInsights, 
+    generateQuiz, 
+    globalSearch 
+} from '../controllers/dashboardController.js';
 import { protect, admin, teacherOrAdmin } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
+
+// Publicly authenticated routes
+router.get('/global-search', protect, globalSearch);
 
 // Admin routes
 router.route('/stats').get(protect, admin, getDashboardStats);
@@ -16,6 +26,5 @@ router.route('/teacher-tools/generate-quiz').post(protect, teacherOrAdmin, gener
 
 // Student routes
 router.route('/student-summary').get(protect, getStudentDashboardSummary);
-
 
 export default router;

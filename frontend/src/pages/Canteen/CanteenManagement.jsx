@@ -10,7 +10,7 @@ const statusColors = {
     Pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300',
     Preparing: 'bg-primary-100 text-primary-800 dark:bg-primary-900/50 dark:text-primary-300',
     'Ready for Pickup': 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300',
-    Completed: 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300',
+    Completed: 'bg-accent-100 text-accent-800 dark:bg-accent-900/50 dark:text-accent-300',
     Cancelled: 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300',
 };
 
@@ -120,9 +120,9 @@ const StudentMenuTab = ({ menu, filter, setFilter, cart, setCart, onOrderPlaced 
                 <div className="lg:col-span-1 p-6 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
                     {orderStatus === 'success' ? (
                         <div className="text-center py-8">
-                            <CheckCircle className="h-16 w-16 mx-auto text-green-500" />
-                            <h3 className="mt-4 text-xl font-bold">Order Placed!</h3>
-                            <p className="mt-2 text-gray-600 dark:text-gray-300">Your order has been sent to the canteen. Check 'My Orders' for status.</p>
+                            <CheckCircle className="h-16 w-16 mx-auto text-accent-500" />
+                            <h3 className="mt-4 text-xl font-bold">Order Confirmed!</h3>
+                            <p className="mt-2 text-gray-600 dark:text-gray-300">Sequence initiated. Track status in 'My Orders'.</p>
                         </div>
                     ) : (
                         <>
@@ -146,7 +146,7 @@ const StudentMenuTab = ({ menu, filter, setFilter, cart, setCart, onOrderPlaced 
                                     <span>₹{total}</span>
                                 </div>
                                 <button onClick={placeOrder} disabled={cart.length === 0 || orderStatus === 'placing'} className="w-full mt-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md disabled:bg-gray-400">
-                                    {orderStatus === 'placing' ? 'Placing Order...' : 'Place Order'}
+                                    {orderStatus === 'placing' ? 'Placing Order...' : 'Confirm Checkout'}
                                 </button>
                             </div>
                         </>
@@ -399,7 +399,7 @@ export default function CanteenManagement() {
 
   return (
     <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg">
-      <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100 mb-6">Canteen</h1>
+      <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100 mb-6">Institute Canteen</h1>
       
       <div className="border-b border-gray-200 dark:border-gray-700">
           <nav className="-mb-px flex space-x-6" aria-label="Tabs">

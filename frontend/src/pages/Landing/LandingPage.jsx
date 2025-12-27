@@ -18,19 +18,19 @@ const PortalCard = ({ role, icon, description, path, color, delay }) => (
             <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-6 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3 ${color} text-white shadow-lg`}>
                 {icon}
             </div>
-            <h3 className="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tighter mb-3">{role} Portal</h3>
+            <h3 className="text-xl font-black text-gray-900 dark:text-white uppercase tracking-tighter mb-3">{role} Portal</h3>
             <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed mb-8">
                 {description}
             </p>
             <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.2em] text-primary-600 dark:text-primary-400">
-                Enter <ArrowRight size={14} className="transition-transform group-hover:translate-x-2" />
+                Enter Node <ArrowRight size={14} className="transition-transform group-hover:translate-x-2" />
             </div>
         </div>
     </Link>
 );
 
 const FeatureBadge = ({ icon, label }) => (
-    <div className="flex items-center gap-3 px-6 py-3 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
+    <div className="flex items-center gap-3 px-6 py-3 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm transition-all hover:border-primary-200">
         <div className="text-primary-500">{icon}</div>
         <span className="text-[0.65rem] font-black uppercase tracking-widest text-gray-600 dark:text-gray-300">{label}</span>
     </div>
@@ -38,98 +38,91 @@ const FeatureBadge = ({ icon, label }) => (
 
 export default function LandingPage() {
   return (
-    <div className="relative overflow-hidden">
-      {/* Dynamic Background Effects */}
+    <div className="relative overflow-hidden bg-gray-50 dark:bg-gray-950">
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-full pointer-events-none overflow-hidden">
           <div className="absolute top-20 left-10 w-[30rem] h-[30rem] bg-primary-400 rounded-full blur-[140px] opacity-20 animate-hero-glow"></div>
           <div className="absolute bottom-20 right-10 w-[40rem] h-[40rem] bg-purple-400 rounded-full blur-[160px] opacity-20 animate-hero-glow" style={{ animationDelay: '-5s' }}></div>
       </div>
 
-      <div className="container mx-auto px-4 pt-20 pb-32 relative z-10 text-center">
-        {/* Top Floating Badge - Increased Font Size & Added Float Animation */}
-        <div className="inline-flex items-center gap-3 px-6 py-3 bg-primary-600/10 dark:bg-primary-400/10 rounded-full border border-primary-500/30 mb-12 animate-float shadow-[0_0_15px_rgba(22,163,74,0.1)] hover:bg-primary-500/20 transition-colors cursor-default">
+      <div className="container mx-auto px-4 pt-24 pb-32 relative z-10 text-center">
+        <div className="inline-flex items-center gap-3 px-6 py-3 bg-primary-600/10 dark:bg-primary-400/10 rounded-full border border-primary-500/30 mb-12 animate-float shadow-[0_0_15px_rgba(124,58,237,0.1)] hover:bg-primary-500/20 transition-colors cursor-default">
             <Sparkles size={18} className="text-primary-600 dark:text-primary-400 animate-pulse" />
             <span className="text-[0.75rem] font-black uppercase tracking-[0.3em] text-primary-700 dark:text-primary-300">
-                Aryan Institute Digital Infrastructure
+                Core Digital Infrastructure
             </span>
         </div>
         
-        {/* Main Hero Section with reduced font sizes */}
         <div className="max-w-6xl mx-auto mb-16">
-            <h1 className="text-4xl md:text-6xl lg:text-7xl font-black tracking-tighter text-gray-900 dark:text-white uppercase leading-[1.1] flex flex-col items-center">
-                {/* Line 1: Smart Systems */}
+            <h1 className="text-3xl md:text-5xl lg:text-6xl font-black tracking-tighter text-gray-900 dark:text-white uppercase leading-[0.95] flex flex-col items-center">
                 <span className="flex flex-wrap justify-center gap-x-4 mb-2">
                     <span className="animate-blur-in opacity-0 inline-block" style={{ animationDelay: '200ms', animationFillMode: 'forwards' }}>
-                        Smart
+                        Modern
                     </span>
-                    <span className="animate-blur-in opacity-0 inline-block text-[#16a34a]" style={{ animationDelay: '500ms', animationFillMode: 'forwards' }}>
-                        Systems.
+                    <span className="animate-blur-in opacity-0 inline-block text-primary-600" style={{ animationDelay: '500ms', animationFillMode: 'forwards' }}>
+                        Education.
                     </span>
                 </span>
-                
-                {/* Line 2: for Smarter Education */}
                 <span className="animate-blur-in opacity-0 inline-block" style={{ animationDelay: '900ms', animationFillMode: 'forwards' }}>
                     <span className="flex flex-wrap justify-center items-baseline gap-x-2 md:gap-x-4">
-                        <span className="text-gray-400 dark:text-gray-600 italic lowercase font-medium tracking-normal text-2xl md:text-3xl lg:text-4xl mr-2">for</span>
-                        <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#4f46e5] via-[#9333ea] to-[#db2777] animate-text-shine" style={{ WebkitBackgroundClip: 'text' }}>
-                            Smarter Education.
+                        <span className="text-gray-400 dark:text-gray-600 italic lowercase font-medium tracking-normal text-xl md:text-2xl lg:text-3xl mr-2">is now</span>
+                        <span className="bg-clip-text text-transparent bg-gradient-to-r from-primary-600 via-purple-600 to-primary-500 animate-text-shine" style={{ WebkitBackgroundClip: 'text' }}>
+                            Smarter.
                         </span>
                     </span>
                 </span>
             </h1>
         </div>
 
-        {/* Hero Subtext */}
-        <p className="text-sm md:text-base text-gray-500 dark:text-gray-400 max-w-2xl mx-auto leading-relaxed mb-24 animate-fade-in opacity-0" style={{ animationDelay: '1500ms', animationFillMode: 'forwards' }}>
-            Experience the power of the Aryan IMS. Secure, AI-integrated, and optimized for high-performance institutional management.
+        <p className="text-sm md:text-xl font-black text-gray-800 dark:text-gray-100 max-w-2xl mx-auto leading-relaxed mb-8 animate-fade-in opacity-0 uppercase tracking-tighter" style={{ animationDelay: '1500ms', animationFillMode: 'forwards' }}>
+            "Smart Systems for Smarter Education."
+        </p>
+        <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 max-w-xl mx-auto mb-24 animate-fade-in opacity-0 uppercase tracking-widest font-bold" style={{ animationDelay: '1700ms', animationFillMode: 'forwards' }}>
+            Aryan Institute: Optimized for high-performance institutional logic.
         </p>
 
-        {/* Portal Selection Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto mb-32">
             <PortalCard 
                 role="Student" 
                 icon={<User size={32} />} 
-                description="Check your attendance, grades, and apply for placements. Your complete academic timeline."
+                description="Access your academic timeline, check results, and explore placement opportunities."
                 path="/login/student"
-                color="bg-blue-600"
-                delay={1700}
+                color="bg-primary-500"
+                delay={1800}
             />
             <PortalCard 
                 role="Faculty" 
                 icon={<UserCog size={32} />} 
-                description="Manage classes, mark attendance, and generate AI student insights with advanced educator tools."
+                description="Manage class sequences, biometric attendance, and AI-driven student performance analytics."
                 path="/login/teacher"
-                color="bg-primary-600"
-                delay={1850}
+                color="bg-secondary-500"
+                delay={1950}
             />
             <PortalCard 
                 role="Admin" 
                 icon={<Shield size={32} />} 
-                description="Complete institutional control. Approve users, manage streams, and monitor real-time metrics."
+                description="High-level institutional control hub. Global registry management and system monitoring."
                 path="/login/admin"
-                color="bg-gray-900 dark:bg-gray-700"
-                delay={2000}
+                color="bg-gray-900 dark:bg-gray-800"
+                delay={2100}
             />
         </div>
 
-        {/* Dynamic Feature Highlights */}
         <div className="flex flex-wrap justify-center gap-4 animate-fade-in opacity-0 mb-32" style={{ animationDelay: '2300ms', animationFillMode: 'forwards' }}>
-            <FeatureBadge icon={<Cpu size={18} />} label="AI-Driven Insights" />
-            <FeatureBadge icon={<Fingerprint size={18} />} label="Biometric Sync Ready" />
-            <FeatureBadge icon={<Globe size={18} />} label="Cloud Infrastructure" />
-            <FeatureBadge icon={<LayoutDashboard size={18} />} label="Modular Architecture" />
-            <FeatureBadge icon={<Zap size={18} />} label="Ultra-Low Latency" />
+            <FeatureBadge icon={<Cpu size={18} />} label="Modular AI Logic" />
+            <FeatureBadge icon={<Fingerprint size={18} />} label="Secure Authentication" />
+            <FeatureBadge icon={<Globe size={18} />} label="Cloud-Edge Sync" />
+            <FeatureBadge icon={<LayoutDashboard size={18} />} label="Reactive Dashboard" />
+            <FeatureBadge icon={<Zap size={18} />} label="Lavender Protocol" />
         </div>
 
-        {/* Registration CTA */}
         <div className="max-w-5xl mx-auto relative group animate-fade-in opacity-0" style={{ animationDelay: '2500ms', animationFillMode: 'forwards' }}>
-            <div className="absolute inset-0 bg-gradient-to-r from-primary-500/20 via-purple-500/20 to-primary-500/20 rounded-[3rem] blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-1000"></div>
+            <div className="absolute inset-0 bg-gradient-to-r from-primary-500/20 via-secondary-500/20 to-primary-500/20 rounded-[3rem] blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-1000"></div>
             <div className="relative p-12 bg-white/50 dark:bg-gray-900/50 backdrop-blur-2xl rounded-[3rem] border border-white/20 dark:border-gray-800 text-center shadow-2xl">
-                <h2 className="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tighter mb-4">Ready to contribute?</h2>
-                <p className="text-gray-500 dark:text-gray-400 mb-8 max-w-lg mx-auto font-medium">New student or faculty member? Register now to request system access from the administrator.</p>
+                <h2 className="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tighter mb-4">Request Access</h2>
+                <p className="text-gray-500 dark:text-gray-400 mb-8 max-w-lg mx-auto font-medium">New student or faculty? Initialize your registration to request system onboarding.</p>
                 <div className="flex flex-wrap justify-center gap-4">
-                    <Link to="/register/student" className="px-8 py-4 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-xs font-black uppercase tracking-widest rounded-2xl hover:scale-105 transition-transform active:scale-95 shadow-xl">Student Registration</Link>
-                    <Link to="/register/teacher" className="px-8 py-4 bg-primary-600 text-white text-xs font-black uppercase tracking-widest rounded-2xl hover:scale-105 transition-transform active:scale-95 shadow-xl">Faculty Onboarding</Link>
+                    <Link to="/register/student" className="px-10 py-5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-xs font-black uppercase tracking-widest rounded-2xl hover:scale-105 transition-transform active:scale-95 shadow-xl">Student Onboarding</Link>
+                    <Link to="/register/teacher" className="px-10 py-5 bg-primary-600 text-white text-xs font-black uppercase tracking-widest rounded-2xl hover:scale-105 transition-transform active:scale-95 shadow-xl shadow-primary-500/30">Faculty Application</Link>
                 </div>
             </div>
         </div>

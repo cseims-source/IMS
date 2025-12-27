@@ -9,7 +9,7 @@ const getAttendance = async (req, res) => {
 
         let query = { stream: streamName, date: date };
         if (subject) query.subject = subject;
-        if (semester) query.semester = semester;
+        if (semester) query.semester = parseInt(semester);
 
         const attendanceRecords = await Attendance.find(query).populate('student', 'firstName lastName');
         res.json(attendanceRecords);
@@ -43,19 +43,23 @@ const saveAttendance = async (req, res) => {
     try {
         const { date, streamName, semester, subject, attendanceData } = req.body;
         
+        if (!subject || !semester || !streamName) {
+            return res.status(400).json({ message: 'Missing core criteria (Subject, Semester, or Stream)' });
+        }
+
         const operations = Object.keys(attendanceData).map(studentId => {
             const status = attendanceData[studentId];
             if (!status) return null; 
             
             return {
                 updateOne: {
-                    filter: { student: studentId, date: date, subject: subject }, // Unique by subject too
+                    filter: { student: studentId, date: date, subject: subject },
                     update: { 
                         $set: { 
                             student: studentId, 
                             date: date, 
                             stream: streamName, 
-                            semester: semester,
+                            semester: parseInt(semester),
                             subject: subject,
                             status: status 
                         } 
@@ -72,43 +76,27 @@ const saveAttendance = async (req, res) => {
         res.status(201).json({ message: 'Attendance saved successfully' });
     } catch (error) {
         console.error("Save Attendance Error:", error);
-        
-        // Specific check for the duplicate key error
-        if (error.code === 11000 || (error.writeErrors && error.writeErrors.some(e => e.code === 11000))) {
-            return res.status(400).json({ 
-                message: 'Database Error: Old restrictions are still active. Please RESTART the backend server to apply the fix.' 
-            });
-        }
-
         res.status(400).json({ message: 'Failed to save attendance', error: error.message });
     }
 };
 
-// New: Aggregated Analytics for Admin View
 const getAttendanceAnalytics = async (req, res) => {
     try {
-        const { stream, semester, subject, startDate, endDate } = req.query;
+        const { stream, semester, subject } = req.query;
 
         let matchStage = {};
-        
-        if (stream) matchStage.stream = stream;
-        if (semester) matchStage.semester = parseInt(semester);
-        if (subject && subject !== 'All') matchStage.subject = subject;
-        
-        if (startDate && endDate) {
-            matchStage.date = { $gte: startDate, $lte: endDate };
-        }
+        if (stream && stream !== 'all') matchStage.stream = stream;
+        if (semester && semester !== 'all') matchStage.semester = parseInt(semester);
+        if (subject && subject !== 'all') matchStage.subject = subject;
 
-        // Aggregate to calculate percentage per student
-        const analytics = await Attendance.aggregate([
+        // 1. Defaulter & Student Percentage
+        const studentStats = await Attendance.aggregate([
             { $match: matchStage },
             {
                 $group: {
                     _id: "$student",
-                    totalClasses: { $sum: 1 },
-                    presentClasses: { 
-                        $sum: { $cond: [{ $eq: ["$status", "present"] }, 1, 0] } 
-                    }
+                    total: { $sum: 1 },
+                    present: { $sum: { $cond: [{ $eq: ["$status", "present"] }, 1, 0] } }
                 }
             },
             {
@@ -116,54 +104,55 @@ const getAttendanceAnalytics = async (req, res) => {
                     from: "students",
                     localField: "_id",
                     foreignField: "_id",
-                    as: "studentInfo"
+                    as: "info"
                 }
             },
-            { $unwind: "$studentInfo" },
+            { $unwind: "$info" },
             {
                 $project: {
-                    _id: 1,
-                    name: { $concat: ["$studentInfo.firstName", " ", "$studentInfo.lastName"] },
-                    rollNo: "$studentInfo._id", // Using ID as roll for now
-                    totalClasses: 1,
-                    presentClasses: 1,
-                    percentage: { 
-                        $multiply: [
-                            { $divide: ["$presentClasses", "$totalClasses"] }, 
-                            100 
-                        ] 
-                    }
+                    name: { $concat: ["$info.firstName", " ", "$info.lastName"] },
+                    roll: "$info._id",
+                    percentage: { $multiply: [{ $divide: ["$present", "$total"] }, 100] },
+                    total: 1,
+                    present: 1
                 }
             },
-            { $sort: { percentage: 1 } } // Sort by lowest attendance first (to catch defaulters)
+            { $sort: { percentage: 1 } }
         ]);
 
-        // Aggregate to calculate Subject-wise performance (for Charts)
+        // 2. Subject Matrix for Chart
         const subjectStats = await Attendance.aggregate([
             { $match: matchStage },
             {
                 $group: {
                     _id: "$subject",
-                    totalRecords: { $sum: 1 },
-                    presentRecords: { 
-                        $sum: { $cond: [{ $eq: ["$status", "present"] }, 1, 0] } 
-                    }
+                    total: { $sum: 1 },
+                    present: { $sum: { $cond: [{ $eq: ["$status", "present"] }, 1, 0] } }
                 }
             },
             {
                 $project: {
                     subject: "$_id",
-                    percentage: { 
-                        $multiply: [
-                            { $divide: ["$presentRecords", "$totalRecords"] }, 
-                            100 
-                        ] 
-                    }
+                    percentage: { $multiply: [{ $divide: ["$present", "$total"] }, 100] }
                 }
             }
         ]);
 
-        res.json({ studentStats: analytics, subjectStats });
+        const totalStudents = await Student.countDocuments(stream !== 'all' ? { stream } : {});
+        const defaulters = studentStats.filter(s => s.percentage < 75).length;
+        const avgAttendance = studentStats.length > 0 
+            ? studentStats.reduce((acc, s) => acc + s.percentage, 0) / studentStats.length 
+            : 0;
+
+        res.json({ 
+            studentStats, 
+            subjectStats,
+            summary: {
+                totalEnrolled: totalStudents,
+                avgAttendance: avgAttendance.toFixed(1),
+                defaulters
+            }
+        });
 
     } catch (error) {
         console.error("Analytics Error:", error);

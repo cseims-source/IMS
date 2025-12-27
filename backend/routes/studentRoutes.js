@@ -1,6 +1,7 @@
 import express from 'express';
 import { 
     getStudents, 
+    getStudentStats,
     getStudentsByStream, 
     addStudent, 
     updateStudent, 
@@ -20,28 +21,25 @@ import { protect, admin, teacherOrAdmin, canViewStudentProfile } from '../middle
 
 const router = express.Router();
 
-// --- Profile Routes (for logged-in student) ---
+// --- Profile Routes ---
 router.route('/profile').get(protect, getStudentProfile);
 router.route('/profile/photo').put(protect, updateStudentProfilePhoto);
 router.route('/profile/fees').get(protect, getMyFees);
 router.route('/profile/fees/:feeId/pay').put(protect, payMyFee);
 
-// Route for AI Advisor
 router.post('/academic-advisor', protect, getAcademicAdvice);
 
-
 // --- Admin/Teacher Routes ---
+router.get('/stats', protect, teacherOrAdmin, getStudentStats);
 router.route('/import').post(protect, admin, importStudents);
 router.route('/').get(protect, teacherOrAdmin, getStudents).post(protect, admin, addStudent);
 router.route('/stream/:streamName').get(protect, teacherOrAdmin, getStudentsByStream);
 
-// Admin-only student modification and deletion, plus view for authorized users
 router.route('/:id')
     .get(protect, canViewStudentProfile, getStudentByIdForView)
     .put(protect, admin, updateStudent)
     .delete(protect, admin, deleteStudent);
 
-// --- Fee Management Routes ---
 router.route('/:id/fees')
     .get(protect, admin, getStudentFees) 
     .post(protect, admin, addStudentFee); 

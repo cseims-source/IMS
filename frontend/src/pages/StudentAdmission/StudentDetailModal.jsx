@@ -1,163 +1,220 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { User, Mail, Phone, Home, GraduationCap, Calendar, X, BarChart2, CheckCircle, Award, DollarSign, Eye, Download, Bookmark } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
+import React, { useEffect, useRef } from 'react';
+import { 
+    X, Phone, Mail, MapPin, Calendar, Printer, ShieldCheck, 
+    Database, Smartphone, Users, CreditCard, ClipboardCheck, 
+    BookOpen, Fingerprint, MessageSquare, Landmark, Trophy, 
+    UserCog, AlertCircle, Bus, Clock, Sparkles
+} from 'lucide-react';
 import { formatDate } from '../../utils/dateFormatter';
-import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
 
-const InfoItem = ({ icon, label, value }) => (
-    <div className="flex items-start text-gray-600 dark:text-gray-300">
-        <div className="mr-4 mt-1 text-gray-400">{icon}</div>
-        <div>
-            <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
-            <p className="font-medium text-gray-800 dark:text-gray-100">{value || 'N/A'}</p>
-        </div>
+const SectionHeader = ({ icon: Icon, title, color = "text-primary-500" }) => (
+    <div className="flex items-center gap-3 mb-5 border-b dark:border-gray-800 pb-3">
+        <Icon size={18} className={color} />
+        <h3 className={`text-[0.7rem] font-black uppercase tracking-[0.3em] ${color}`}>{title}</h3>
     </div>
 );
 
-const Card = ({ title, icon, children }) => (
-    <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg h-full">
-        <div className="flex items-center text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">
-            {React.cloneElement(icon, { className: "mr-3 text-primary-500"})}
-            {title}
+const InfoBit = ({ label, value, icon: Icon }) => (
+    <div className="space-y-1.5 group">
+        <div className="flex items-center gap-2">
+            {Icon && <Icon size={10} className="text-gray-400" />}
+            <span className="text-[0.55rem] font-black uppercase tracking-widest text-gray-400 group-hover:text-primary-500 transition-colors">{label}</span>
         </div>
-        <div className="space-y-4">
-            {children}
-        </div>
+        <p className="text-[0.7rem] font-bold text-gray-800 dark:text-gray-100 break-words">{value || '---'}</p>
     </div>
 );
 
-const LoadingCard = ({ title, icon }) => (
-    <Card title={title} icon={icon}>
-        <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded-md animate-pulse"></div>
-        <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded-md animate-pulse"></div>
-    </Card>
-);
-
-const StudentDetailModal = ({ student, onClose }) => {
-    const { api } = useAuth();
-    const [details, setDetails] = useState({ attendance: null, academics: null, fees: null });
-    const [loading, setLoading] = useState({ attendance: true, academics: true, fees: true });
-    
+export default function StudentDetailModal({ student, onClose }) {
     useEffect(() => {
-        if (!student) return;
-
-        const fetchDetails = async () => {
-            try {
-                const [attendanceData, academicsData, feesData] = await Promise.all([
-                    api(`/api/attendance/student/${student._id}`).finally(() => setLoading(prev => ({ ...prev, attendance: false }))),
-                    api(`/api/marksheet/student/${student._id}`).finally(() => setLoading(prev => ({ ...prev, academics: false }))),
-                    api(`/api/students/${student._id}/fees`).finally(() => setLoading(prev => ({ ...prev, fees: false }))),
-                ]);
-                setDetails({ attendance: attendanceData, academics: academicsData, fees: feesData });
-            } catch (error) {
-                console.error("Failed to load student details:", error);
-            }
-        };
-
-        fetchDetails();
-    }, [student, api]);
-
-    const attendanceSummary = useMemo(() => {
-        if (!details.attendance) return { overall: '0', total: 0 };
-        const totalDays = details.attendance.length;
-        if (totalDays === 0) return { overall: 'N/A', total: 0 };
-        const presentDays = details.attendance.filter(a => a.status === 'present').length;
-        return { overall: ((presentDays / totalDays) * 100).toFixed(1), total: totalDays };
-    }, [details.attendance]);
-
-    const academicSummary = useMemo(() => {
-        if (!details.academics || details.academics.length === 0) return { gpa: 'N/A' };
-        const avgPercentage = details.academics.reduce((acc, m) => acc + m.percentage, 0) / details.academics.length;
-        return { gpa: (avgPercentage / 25).toFixed(2) };
-    }, [details.academics]);
+        if (student?._shouldPrint) {
+            const timer = setTimeout(() => window.print(), 800);
+            return () => clearTimeout(timer);
+        }
+    }, [student]);
 
     if (!student) return null;
 
     const photoUrl = student.photo || `https://api.dicebear.com/8.x/initials/svg?seed=${student.firstName}%20${student.lastName}`;
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4">
-            <div className="bg-gray-100 dark:bg-gray-900 p-8 rounded-xl shadow-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto relative">
-                <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 z-10">
-                    <X size={24} />
-                </button>
+        <div className="fixed inset-0 bg-gray-950/90 backdrop-blur-xl flex justify-center items-center z-[250] p-4 print:p-0 print:bg-white print:static">
+            <div className="bg-white dark:bg-gray-950 rounded-[3rem] shadow-2xl w-full max-w-5xl h-[95vh] flex flex-col border border-white/10 overflow-hidden animate-scale-in print:h-auto print:shadow-none print:border-none print:rounded-none">
                 
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg mb-6">
-                    <div className="flex flex-col sm:flex-row items-center">
-                        <img src={photoUrl} alt="Student" className="w-24 h-24 rounded-full mr-0 sm:mr-6 mb-4 sm:mb-0 border-4 border-primary-200 object-cover" />
+                {/* Dossier Hub Header */}
+                <div className="p-8 border-b dark:border-gray-800 flex items-center justify-between bg-white dark:bg-gray-950 z-20 print:hidden">
+                    <div className="flex items-center gap-6">
+                        <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-2xl text-primary-600 shadow-inner"><Fingerprint size={28} /></div>
                         <div>
-                            <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100 text-center sm:text-left">{student.firstName} {student.lastName}</h1>
-                            <p className="text-gray-600 dark:text-gray-400 text-center sm:text-left">{student.stream} | ID: {student._id.slice(-6).toUpperCase()}</p>
+                            <h2 className="text-xl font-black text-gray-900 dark:text-white uppercase tracking-tighter leading-none">Identity <span className="text-primary-600">Dossier</span></h2>
+                            <p className="text-[0.6rem] font-bold text-gray-400 uppercase tracking-[0.4em] mt-2 flex items-center gap-2"><Database size={12} /> Registry Node: {student._id?.slice(-8).toUpperCase()}</p>
                         </div>
+                    </div>
+                    <div className="flex gap-4">
+                        <button onClick={() => window.print()} className="flex items-center gap-3 px-6 py-3 bg-accent-500 text-white rounded-2xl font-black uppercase text-[0.65rem] tracking-[0.2em] shadow-xl hover:bg-accent-600 transition active:scale-95 group"><Printer size={16} /> Print Node</button>
+                        <button onClick={onClose} className="p-3 bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-red-500 rounded-2xl transition-all"><X size={20} /></button>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div className="lg:col-span-1 space-y-6">
-                        <Card title="Personal Information" icon={<User />}>
-                            <InfoItem icon={<Mail size={20} />} label="Email" value={student.email} />
-                            <InfoItem icon={<Phone size={20} />} label="Phone" value={student.phone} />
-                            <InfoItem icon={<Calendar size={20} />} label="Date of Birth" value={formatDate(student.dob)} />
-                            <InfoItem icon={<Home size={20} />} label="Address" value={student.address} />
-                             <InfoItem icon={<GraduationCap size={20} />} label="Stream" value={student.stream} />
-                             <InfoItem icon={<Bookmark size={20} />} label="Current Semester" value={student.currentSemester} />
-                        </Card>
-                    </div>
+                <div className="flex-grow overflow-y-auto p-12 scrollbar-hide space-y-12 print:p-0">
+                    
+                    {/* Top Profile Cluster */}
+                    <section className="flex flex-col md:flex-row gap-10 items-start">
+                        <div className="relative">
+                            <div className="w-40 h-40 rounded-[2.5rem] bg-gray-50 dark:bg-gray-900 border-4 border-white dark:border-gray-800 shadow-2xl overflow-hidden relative group">
+                                <img src={photoUrl} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt="Identity" />
+                            </div>
+                            <div className="absolute -bottom-4 -right-4 bg-primary-600 text-white p-2.5 rounded-xl shadow-xl animate-float"><ShieldCheck size={18} /></div>
+                        </div>
+                        <div className="flex-grow grid grid-cols-1 md:grid-cols-3 gap-8">
+                            <div className="md:col-span-2 space-y-2">
+                                <h1 className="text-3xl md:text-4xl font-black text-gray-900 dark:text-white uppercase tracking-tighter leading-none mb-4">{student.firstName} {student.lastName}</h1>
+                                <div className="flex flex-wrap gap-3">
+                                    <span className="px-4 py-1.5 bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300 text-[0.65rem] font-black uppercase tracking-widest rounded-xl border border-primary-200/50">{student.course}</span>
+                                    <span className="px-4 py-1.5 bg-accent-100 dark:bg-accent-900/50 text-accent-700 dark:text-accent-300 text-[0.65rem] font-black uppercase tracking-widest rounded-xl border border-accent-200/50">{student.branch}</span>
+                                    <span className="px-4 py-1.5 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 text-[0.65rem] font-black uppercase tracking-widest rounded-xl">Node: {student.section || 'A'}</span>
+                                    <span className="px-4 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-[0.65rem] font-black uppercase tracking-widest rounded-xl flex items-center gap-2 border border-gray-200/50 shadow-inner"><Clock size={12}/> {student.academicYear || 'Not Logged'}</span>
+                                </div>
+                            </div>
+                            <div className="bg-gray-50 dark:bg-gray-900/50 p-6 rounded-3xl border text-center flex flex-col justify-center">
+                                <p className="text-[0.55rem] font-black text-gray-400 uppercase tracking-widest mb-1">Registry Status</p>
+                                <p className={`text-lg font-black uppercase tracking-tighter ${student.status === 'Approved' ? 'text-accent-500' : 'text-yellow-500'}`}>{student.status || 'Pending Cycle'}</p>
+                            </div>
+                        </div>
+                    </section>
 
-                    <div className="lg:col-span-2 space-y-6">
-                         {loading.attendance ? <LoadingCard title="Attendance" icon={<CheckCircle />} /> : (
-                             <Card title="Attendance Summary" icon={<CheckCircle />}>
-                                 <div className="text-center">
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">Overall Percentage</p>
-                                    <p className="text-4xl font-bold text-green-600">{attendanceSummary.overall}%</p>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400">Based on {attendanceSummary.total} recorded days.</p>
-                                 </div>
-                             </Card>
-                         )}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12">
+                        
+                        {/* Connectivity */}
+                        <div className="space-y-6">
+                            <SectionHeader icon={Smartphone} title="Connectivity Nodes" />
+                            <div className="grid grid-cols-1 gap-6">
+                                <InfoBit label="Primary Phone" value={student.phone} icon={Phone} />
+                                <InfoBit label="WhatsApp Node" value={student.whatsappNumber} icon={MessageSquare} />
+                                <InfoBit label="Registry Email" value={student.email} icon={Mail} />
+                                <InfoBit label="Emergency SOS" value={`${student.emergencyContactName} (${student.emergencyContactPhone})`} icon={AlertCircle} />
+                            </div>
+                        </div>
 
-                          {loading.academics ? <LoadingCard title="Academics" icon={<Award />} /> : (
-                             <Card title="Academic Summary" icon={<Award />}>
-                                {details.academics && details.academics.length > 0 ? (
-                                    <div className="text-center">
-                                        <p className="text-sm text-gray-500 dark:text-gray-400">Calculated GPA</p>
-                                        <p className="text-4xl font-bold text-primary-600">{academicSummary.gpa}</p>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">Based on {details.academics.length} exam records.</p>
+                        {/* Entrance Credentials */}
+                        <div className="space-y-6">
+                            <SectionHeader icon={Trophy} title="Entrance Credentials" color="text-indigo-500" />
+                            <div className="grid grid-cols-1 gap-6 bg-indigo-50/20 dark:bg-indigo-900/10 p-5 rounded-3xl border border-indigo-100">
+                                <InfoBit label="Exam Module" value={student.appearedInEntrance} />
+                                <InfoBit label="Roll Sequence" value={student.entranceRollNo} />
+                                <InfoBit label="Aadhar UID" value={student.aadharNumber} />
+                                <InfoBit label="Social Identity" value={student.facebookId} />
+                            </div>
+                        </div>
+
+                        {/* Institutional Services */}
+                        <div className="space-y-6">
+                            <SectionHeader icon={Bus} title="Institutional Services" color="text-accent-500" />
+                            <div className="grid grid-cols-1 gap-6">
+                                <InfoBit label="Accommodation Logic" value={student.accommodationRequired} />
+                                <InfoBit label="Staff Referral Hub" value={student.staffName} icon={UserCog} />
+                                <InfoBit label="Admission Node" value={formatDate(student.admissionDate)} />
+                            </div>
+                        </div>
+
+                        {/* Education Legacy */}
+                        <div className="space-y-6">
+                            <SectionHeader icon={BookOpen} title="Legacy Node (10th)" color="text-primary-500" />
+                            <div className="grid grid-cols-1 gap-6">
+                                <InfoBit label="Board Protocol" value={student.education10th?.board} />
+                                <InfoBit label="School Name" value={student.education10th?.schoolName} />
+                                <div className="flex justify-between items-center pr-4">
+                                    <InfoBit label="Marks" value={student.education10th?.marksSecured} />
+                                    <p className="text-xl font-black text-primary-500">{student.education10th?.percentage || '0'}%</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Family Lattice */}
+                        <div className="space-y-6">
+                            <SectionHeader icon={Users} title="Family Lattice" color="text-gray-900 dark:text-white" />
+                            <div className="grid grid-cols-1 gap-6 bg-gray-50 dark:bg-gray-900/30 p-6 rounded-3xl border border-gray-100">
+                                <InfoBit label="Father Node" value={`${student.family?.father?.name} (${student.family?.father?.occupation})`} />
+                                <InfoBit label="Mother Node" value={`${student.family?.mother?.name} (${student.family?.mother?.occupation})`} />
+                                <InfoBit label="Guardian SOS" value={student.family?.guardianPhone} />
+                            </div>
+                        </div>
+
+                        {/* Additional Details */}
+                        <div className="space-y-6">
+                            <SectionHeader icon={Sparkles} title="Identity Modifiers" color="text-secondary-500" />
+                            <div className="grid grid-cols-1 gap-6">
+                                <InfoBit label="Date of Logic (DOB)" value={formatDate(student.dob)} icon={Calendar} />
+                                <InfoBit label="Blood Group Node" value={student.bloodGroup} />
+                                <InfoBit label="Category Status" value={student.category} />
+                                <InfoBit label="Religion Node" value={student.religion} />
+                            </div>
+                        </div>
+
+                        {/* Spatial Logic */}
+                        <div className="lg:col-span-3">
+                            <SectionHeader icon={MapPin} title="Spatial Logic (Addresses)" color="text-primary-600" />
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div className="p-6 bg-primary-50 dark:bg-primary-900/10 rounded-3xl border border-primary-100">
+                                    <h4 className="text-[0.6rem] font-black uppercase text-primary-700 tracking-widest mb-4">Present Spatial Link</h4>
+                                    <p className="text-[0.75rem] font-bold text-gray-800 dark:text-gray-200 leading-relaxed">
+                                        {student.presentAddress?.address}, {student.presentAddress?.city}, {student.presentAddress?.district}, {student.presentAddress?.state} - {student.presentAddress?.pincode}
+                                        <br/><span className="text-[0.6rem] text-primary-400 font-bold uppercase mt-2 block">PO: {student.presentAddress?.postOffice} | PS: {student.presentAddress?.policeStation}</span>
+                                    </p>
+                                </div>
+                                <div className="p-6 bg-gray-50 dark:bg-gray-900/50 rounded-3xl border border-gray-100">
+                                    <h4 className="text-[0.6rem] font-black uppercase text-gray-500 tracking-widest mb-4">Permanent Core Link</h4>
+                                    <p className="text-[0.75rem] font-bold text-gray-600 dark:text-gray-400 leading-relaxed">
+                                        {student.isAddressSame ? "SYNCED WITH PRESENT NODE" : `${student.permanentAddress?.address || 'Not Logged'}, ${student.permanentAddress?.city || ''}, ${student.permanentAddress?.state || ''}`}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Document Audit */}
+                        <div className="lg:col-span-3">
+                            <SectionHeader icon={ClipboardCheck} title="Document Asset Audit" color="text-indigo-600" />
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div className="space-y-3">
+                                    <p className="text-[0.6rem] font-black uppercase text-gray-400">Original Logic Logged</p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {student.documents?.original?.length > 0 ? student.documents.original.map(doc => (
+                                            <span key={doc} className="px-3 py-1 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 text-[0.55rem] font-black rounded-lg border border-primary-100">{doc}</span>
+                                        )) : <span className="text-[0.6rem] italic text-gray-400">Empty Record.</span>}
                                     </div>
-                                ) : <p className="text-center text-gray-500">No academic records found.</p>}
-                            </Card>
-                          )}
-
-                          {loading.fees ? <LoadingCard title="Fees" icon={<DollarSign />} /> : (
-                            <Card title="Fee Records" icon={<DollarSign />}>
-                                {details.fees && details.fees.length > 0 ? (
-                                    <ul className="space-y-2">
-                                        {details.fees.map(fee => (
-                                            <li key={fee._id} className="flex justify-between items-center text-sm p-2 bg-gray-50 dark:bg-gray-700/50 rounded-md">
-                                                <div>
-                                                    <p className="font-medium">{fee.type}</p>
-                                                    <p className="text-xs text-gray-500 dark:text-gray-400">Due: {formatDate(fee.dueDate)}</p>
-                                                </div>
-                                                <div className="text-right">
-                                                    <p className="font-semibold">₹{fee.amount.toLocaleString()}</p>
-                                                     {fee.status === 'Paid' ? (
-                                                        <span className="px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300">Paid</span>
-                                                    ) : (
-                                                        <span className="px-2 py-0.5 text-xs rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300">Pending</span>
-                                                    )}
-                                                </div>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                ) : <p className="text-center text-gray-500">No fee records found.</p>}
-                            </Card>
-                          )}
+                                </div>
+                                <div className="space-y-3">
+                                    <p className="text-[0.6rem] font-black uppercase text-gray-400">Xerox Logic Logged</p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {student.documents?.xerox?.length > 0 ? student.documents.xerox.map(doc => (
+                                            <span key={doc} className="px-3 py-1 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-[0.55rem] font-black rounded-lg border border-gray-100">{doc}</span>
+                                        )) : <span className="text-[0.6rem] italic text-gray-400">Empty Record.</span>}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
+
+                    {/* Financial Ledger */}
+                    <section className="bg-gradient-to-br from-gray-900 to-primary-900 p-10 rounded-[3.5rem] text-white shadow-2xl relative overflow-hidden">
+                        <div className="relative z-10 grid grid-cols-1 md:grid-cols-5 gap-10">
+                            <div className="md:col-span-5 flex items-center gap-4 mb-2">
+                                <CreditCard size={24} className="text-primary-400" />
+                                <h3 className="text-xl font-black uppercase tracking-tighter">11. Financial Ledger Matrix</h3>
+                            </div>
+                            <InfoBit label="Pattern" value={student.paymentPattern} />
+                            <InfoBit label="Cycle 1 (Y1)" value={`₹${student.yearFees?.y1?.toLocaleString()}`} />
+                            <InfoBit label="Cycle 2 (Y2)" value={`₹${student.yearFees?.y2?.toLocaleString()}`} />
+                            <InfoBit label="Cycle 3 (Y3)" value={`₹${student.yearFees?.y3?.toLocaleString()}`} />
+                            <InfoBit label="Campus (Bus/Hostel)" value={`₹${student.yearFees?.hostelBus?.toLocaleString()}`} />
+                        </div>
+                    </section>
+                </div>
+
+                <div className="p-6 border-t dark:border-gray-800 bg-white/80 dark:bg-gray-950/80 backdrop-blur-2xl flex justify-end gap-5 z-20 print:hidden">
+                    <p className="mr-auto self-center text-[0.55rem] font-black uppercase tracking-[0.4em] text-gray-400 ml-4 hidden md:block">Institutional Registry Node • AIET Bhubaneswar</p>
+                    <button onClick={onClose} className="px-10 py-3.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-[0.6rem] font-black uppercase tracking-widest rounded-2xl active:scale-95 transition-transform shadow-xl">Exit Session</button>
                 </div>
             </div>
         </div>
     );
-};
-
-export default StudentDetailModal;
+}

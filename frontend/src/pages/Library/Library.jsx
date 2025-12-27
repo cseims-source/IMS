@@ -68,7 +68,6 @@ const TransactionHistoryTab = ({ transactions, books, users }) => {
         });
     }, [transactions, bookFilter, userFilter]);
 
-    // Create a unique list of users who have transactions for the filter dropdown
     const transactionUsers = useMemo(() => {
         const userMap = new Map();
         transactions.forEach(t => {
@@ -131,11 +130,11 @@ const TransactionHistoryTab = ({ transactions, books, users }) => {
 
 export default function Library() {
   const [activeTab, setActiveTab] = useState('books');
-  const { api } = useAuth();
+  const { user, api } = useAuth();
   const [books, setBooks] = useState([]);
   const [issued, setIssued] = useState([]);
   const [transactions, setTransactions] = useState([]);
-  const [users, setUsers] = useState([]); // In a real app, this would be a searchable user list.
+  const [users, setUsers] = useState([]);
   const [isBookFormOpen, setIsBookFormOpen] = useState(false);
   const [isIssueFormOpen, setIsIssueFormOpen] = useState(false);
   const [editingBook, setEditingBook] = useState(null);
@@ -144,14 +143,16 @@ export default function Library() {
   const [bookFilter, setBookFilter] = useState('');
   const [studentFilter, setStudentFilter] = useState('');
 
+  const isAdmin = user?.role === 'Admin';
 
   useEffect(() => {
     fetchBooks();
-    fetchIssuedBooks();
-    fetchTransactions();
-    // A simplified user fetch for the demo
-    api('/api/students').then(data => setUsers(data.map(d => ({...d, role: 'Student'}))));
-  }, [api]);
+    if (isAdmin) {
+        fetchIssuedBooks();
+        fetchTransactions();
+        api('/api/students').then(data => setUsers(data.map(d => ({...d, role: 'Student'}))));
+    }
+  }, [api, isAdmin]);
 
   const fetchBooks = async () => setBooks(await api('/api/library/books'));
   const fetchIssuedBooks = async () => setIssued(await api('/api/library/transactions/issued'));
@@ -238,7 +239,7 @@ export default function Library() {
                 return (aValue.getTime() - bValue.getTime()) * (sortConfig.direction === 'ascending' ? 1 : -1);
             }
             
-            return 0; // Default return
+            return 0;
         });
     }
     return sortableItems;
@@ -255,37 +256,41 @@ export default function Library() {
 
   return (
     <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg">
-      <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100 mb-6">Library Management</h1>
+      <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100 mb-6">Library Hub</h1>
       
-      <div className="border-b border-gray-200 dark:border-gray-700">
-          <nav className="-mb-px flex space-x-4" aria-label="Tabs">
-            <TabButton active={activeTab === 'books'} onClick={() => setActiveTab('books')}>All Books</TabButton>
-            <TabButton active={activeTab === 'issued'} onClick={() => setActiveTab('issued')}>Issued Books</TabButton>
-            <TabButton active={activeTab === 'history'} onClick={() => setActiveTab('history')}>Transaction History</TabButton>
-          </nav>
-      </div>
+      {isAdmin && (
+        <div className="border-b border-gray-200 dark:border-gray-700 mb-6">
+            <nav className="-mb-px flex space-x-4" aria-label="Tabs">
+                <TabButton active={activeTab === 'books'} onClick={() => setActiveTab('books')}>All Books</TabButton>
+                <TabButton active={activeTab === 'issued'} onClick={() => setActiveTab('issued')}>Issued Books</TabButton>
+                <TabButton active={activeTab === 'history'} onClick={() => setActiveTab('history')}>Transaction History</TabButton>
+            </nav>
+        </div>
+      )}
 
       <div className="mt-6">
         {activeTab === 'books' && (
             <div>
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-semibold">Book Collection</h2>
-                    <button onClick={() => { setEditingBook(null); setIsBookFormOpen(true); }} className="flex items-center text-sm px-3 py-1.5 bg-primary-600 text-white rounded-md"><Plus size={16} className="mr-1" />Add Book</button>
+                    {isAdmin && <button onClick={() => { setEditingBook(null); setIsBookFormOpen(true); }} className="flex items-center text-sm px-3 py-1.5 bg-primary-600 text-white rounded-md"><Plus size={16} className="mr-1" />Add Book</button>}
                 </div>
-                 <Table headers={['Title', 'Author', 'Status', 'Actions']} data={books} renderRow={(book) => (
+                 <Table headers={['Title', 'Author', 'Status', ...(isAdmin ? ['Actions'] : [])]} data={books} renderRow={(book) => (
                     <tr key={book._id} className="border-b dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700/50">
                         <td className="p-3">{book.title}</td>
                         <td className="p-3">{book.author}</td>
                         <td className="p-3"><span className={`px-2 py-1 text-xs font-medium rounded-full ${book.status === 'Available' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>{book.status}</span></td>
-                        <td className="p-3 flex gap-2">
-                           <button onClick={() => { setEditingBook(book); setIsBookFormOpen(true); }} className="p-2 text-primary-600 hover:bg-primary-100 rounded-full"><Edit size={18}/></button>
-                           <button onClick={() => handleDeleteBook(book._id)} className="p-2 text-red-600 hover:bg-red-100 rounded-full"><Trash2 size={18}/></button>
-                        </td>
+                        {isAdmin && (
+                            <td className="p-3 flex gap-2">
+                                <button onClick={() => { setEditingBook(book); setIsBookFormOpen(true); }} className="p-2 text-primary-600 hover:bg-primary-100 rounded-full"><Edit size={18}/></button>
+                                <button onClick={() => handleDeleteBook(book._id)} className="p-2 text-red-600 hover:bg-red-100 rounded-full"><Trash2 size={18}/></button>
+                            </td>
+                        )}
                     </tr>
                  )}/>
             </div>
         )}
-        {activeTab === 'issued' && (
+        {isAdmin && activeTab === 'issued' && (
             <div>
                  <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-semibold">Currently Issued Books</h2>
@@ -351,7 +356,7 @@ export default function Library() {
                 </div>
             </div>
         )}
-        {activeTab === 'history' && <TransactionHistoryTab transactions={transactions} books={books} users={users} />}
+        {isAdmin && activeTab === 'history' && <TransactionHistoryTab transactions={transactions} books={books} users={users} />}
       </div>
       {isBookFormOpen && <BookForm book={editingBook} onSave={handleSaveBook} onCancel={() => setIsBookFormOpen(false)} />}
       {isIssueFormOpen && <IssueForm books={books} users={users} onSave={handleIssueBook} onCancel={() => setIsIssueFormOpen(false)} />}

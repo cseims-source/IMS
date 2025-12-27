@@ -1,111 +1,101 @@
 import Faculty from '../models/facultyModel.js';
+import User from '../models/userModel.js';
 
-const getFaculty = async (req, res) => {
+export const getFaculty = async (req, res) => {
     try {
-        const faculty = await Faculty.find({});
+        const faculty = await Faculty.find({}).sort({ name: 1 });
         res.json(faculty);
     } catch (error) {
-        res.status(500).json({ message: 'Server Error' });
+        res.status(500).json({ message: 'Registry synchronization failed.' });
     }
 };
 
-const addFaculty = async (req, res) => {
+export const getFacultyStats = async (req, res) => {
     try {
-        const { name, subject, email, phone, qualification, assignedStreams, assignedSubjects, photo } = req.body;
-        const faculty = new Faculty({ name, subject, email, phone, qualification, assignedStreams, assignedSubjects, photo });
-        const createdFaculty = await faculty.save();
-        res.status(201).json(createdFaculty);
+        const total = await Faculty.countDocuments();
+        const activeNodes = await Faculty.countDocuments({ status: 'Active' });
+        const departments = await Faculty.distinct('department');
+        const seniorAssets = await Faculty.countDocuments({ experienceYears: { $gte: 5 } });
+
+        res.json({
+            total,
+            activeNodes,
+            deptClusters: departments.length,
+            seniorAssets,
+            syncStatus: 'Optimal'
+        });
     } catch (error) {
-        res.status(400).json({ message: 'Invalid data' });
+        res.status(500).json({ message: 'Stats aggregation failure.' });
     }
 };
 
-const updateFaculty = async (req, res) => {
+export const addFaculty = async (req, res) => {
     try {
-        const { name, subject, email, phone, qualification, assignedStreams, assignedSubjects, photo } = req.body;
-        const faculty = await Faculty.findById(req.params.id);
+        const email = req.body.email.toLowerCase();
+        const exists = await Faculty.findOne({ email });
+        if (exists) return res.status(400).json({ message: 'Identity Node already exists.' });
 
+        const faculty = await Faculty.create({ ...req.body, email });
+        res.status(201).json(faculty);
+    } catch (error) {
+        res.status(400).json({ message: 'Transmission error: ' + error.message });
+    }
+};
+
+export const updateFaculty = async (req, res) => {
+    try {
+        const faculty = await Faculty.findById(req.params.id);
         if (faculty) {
-            faculty.name = name || faculty.name;
-            faculty.subject = subject || faculty.subject;
-            faculty.email = email || faculty.email;
-            faculty.phone = phone || faculty.phone;
-            faculty.qualification = qualification || faculty.qualification;
-            if (assignedStreams !== undefined) {
-                faculty.assignedStreams = Array.isArray(assignedStreams) ? assignedStreams : [];
-            }
-            if (assignedSubjects !== undefined) {
-                faculty.assignedSubjects = Array.isArray(assignedSubjects) ? assignedSubjects : [];
-            }
-            if (photo !== undefined) {
-                faculty.photo = photo;
-            }
-            const updatedFaculty = await faculty.save();
-            res.json(updatedFaculty);
+            if (req.body.email) req.body.email = req.body.email.toLowerCase();
+            Object.assign(faculty, req.body);
+            const updated = await faculty.save();
+            res.json(updated);
         } else {
-            res.status(404).json({ message: 'Faculty not found' });
+            res.status(404).json({ message: 'Node not found.' });
         }
     } catch (error) {
-        res.status(400).json({ message: 'Invalid data' });
+        res.status(400).json({ message: 'Update sequence failed.' });
     }
 };
 
-const deleteFaculty = async (req, res) => {
+export const deleteFaculty = async (req, res) => {
     try {
         const faculty = await Faculty.findById(req.params.id);
         if (faculty) {
+            await User.deleteOne({ email: faculty.email });
             await faculty.deleteOne();
-            res.json({ message: 'Faculty removed' });
+            res.json({ message: 'Node purged from registry.' });
         } else {
-            res.status(404).json({ message: 'Faculty not found' });
+            res.status(404).json({ message: 'Node not identified.' });
         }
     } catch (error) {
-        res.status(500).json({ message: 'Server Error' });
+        res.status(500).json({ message: 'Purge protocol error.' });
     }
 };
 
-const importFaculty = async (req, res) => {
+export const importFaculty = async (req, res) => {
     const { facultyMembers } = req.body;
-
-    if (!facultyMembers || !Array.isArray(facultyMembers) || facultyMembers.length === 0) {
-        return res.status(400).json({ message: 'No faculty data provided.' });
-    }
-
-    const newFaculty = [];
-    const failedImports = [];
-    const incomingEmails = facultyMembers.map(f => f.email).filter(Boolean);
+    if (!Array.isArray(facultyMembers)) return res.status(400).json({ message: 'Invalid data stream.' });
 
     try {
-        const existingFaculty = await Faculty.find({ email: { $in: incomingEmails } });
-        const existingEmails = new Set(existingFaculty.map(f => f.email));
+        const results = { imported: 0, failed: 0, errors: [] };
+        for (const f of facultyMembers) {
+            try {
+                const email = f.email?.toLowerCase();
+                if (!email) throw new Error('Missing Email');
+                
+                const exists = await Faculty.findOne({ email });
+                if (exists) throw new Error('Duplicate Identity');
 
-        facultyMembers.forEach((member, index) => {
-            if (!member.email || !member.name || !member.subject) {
-                failedImports.push({ member, reason: `Missing required fields (name, email, subject) on row ${index + 2}.` });
-            } else if (existingEmails.has(member.email)) {
-                failedImports.push({ member, reason: `Email '${member.email}' already exists.` });
-            } else {
-                newFaculty.push(member);
-                existingEmails.add(member.email);
+                await Faculty.create({ ...f, email });
+                results.imported++;
+            } catch (err) {
+                results.failed++;
+                results.errors.push({ node: f.name || 'Unknown', reason: err.message });
             }
-        });
-
-        let insertedCount = 0;
-        if (newFaculty.length > 0) {
-            const result = await Faculty.insertMany(newFaculty, { ordered: false });
-            insertedCount = result.length;
         }
-
-        res.status(201).json({
-            message: 'Import process completed.',
-            importedCount: insertedCount,
-            failedCount: failedImports.length,
-            errors: failedImports,
-        });
-
+        res.status(201).json(results);
     } catch (error) {
-        res.status(500).json({ message: 'An error occurred during the import process.', error: error.message });
+        res.status(500).json({ message: 'Bulk injection failed.' });
     }
 };
-
-export { getFaculty, addFaculty, updateFaculty, deleteFaculty, importFaculty };

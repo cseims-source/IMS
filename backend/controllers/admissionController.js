@@ -1,38 +1,31 @@
 import AdmissionInquiry from '../models/admissionInquiryModel.js';
+import Student from '../models/studentModel.js';
 
-// @desc    Submit a new admission inquiry
+// @desc    Submit a full admission request
 // @route   POST /api/admission/inquiry
 // @access  Public
 const submitInquiry = async (req, res) => {
     try {
-        const { name, mobile, email, course, branch, state, city } = req.body;
+        const inquiryData = req.body;
 
-        if (!name || !mobile || !email || !course || !state || !city) {
-            return res.status(400).json({ message: 'Please fill in all required fields.' });
+        if (!inquiryData.name || !inquiryData.mobile || !inquiryData.email || !inquiryData.course) {
+            return res.status(400).json({ message: 'Core identity markers are mandatory.' });
         }
 
-        const inquiry = await AdmissionInquiry.create({
-            name,
-            mobile,
-            email,
-            course,
-            branch,
-            state,
-            city
-        });
+        const inquiry = await AdmissionInquiry.create(inquiryData);
 
         res.status(201).json({
             success: true,
-            message: 'Inquiry submitted successfully! Our admissions team will contact you soon.',
+            message: 'Onboarding request initialized. Our admissions team will review your dossier.',
             data: inquiry
         });
     } catch (error) {
-        console.error("Admission Inquiry Error:", error);
-        res.status(500).json({ message: 'Server Error. Please try again later.' });
+        console.error("Admission Request Error:", error);
+        res.status(500).json({ message: 'Server Protocol Error.' });
     }
 };
 
-// @desc    Get all admission inquiries
+// @desc    Get all admission requests
 // @route   GET /api/admission/requests
 // @access  Admin
 const getInquiries = async (req, res) => {
@@ -40,43 +33,73 @@ const getInquiries = async (req, res) => {
         const inquiries = await AdmissionInquiry.find({}).sort({ createdAt: -1 });
         res.json(inquiries);
     } catch (error) {
-        res.status(500).json({ message: 'Server Error' });
+        res.status(500).json({ message: 'Registry fetch failed.' });
     }
 };
 
-// @desc    Update an inquiry status or notes
+// @desc    Accept/Reject Inquiry and Sync with Registry
 // @route   PUT /api/admission/requests/:id
 // @access  Admin
 const updateInquiry = async (req, res) => {
     try {
         const inquiry = await AdmissionInquiry.findById(req.params.id);
-        if (inquiry) {
-            inquiry.status = req.body.status || inquiry.status;
-            inquiry.notes = req.body.notes !== undefined ? req.body.notes : inquiry.notes;
-            const updatedInquiry = await inquiry.save();
-            res.json(updatedInquiry);
-        } else {
-            res.status(404).json({ message: 'Inquiry not found' });
+        if (!inquiry) return res.status(404).json({ message: 'Inquiry not found' });
+
+        const { status, notes } = req.body;
+        
+        // If accepted, create or update a Student record
+        if (status === 'Accepted' && inquiry.status !== 'Accepted') {
+            const studentExists = await Student.findOne({ email: inquiry.email.toLowerCase() });
+            if (!studentExists) {
+                // Parse first/last name
+                const nameParts = inquiry.name.trim().split(/\s+/);
+                const firstName = nameParts[0];
+                const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+
+                await Student.create({
+                    firstName,
+                    lastName,
+                    email: inquiry.email.toLowerCase(),
+                    phone: inquiry.mobile,
+                    gender: inquiry.gender,
+                    dob: inquiry.dob,
+                    course: inquiry.course,
+                    branch: inquiry.branch,
+                    academicYear: inquiry.academicYear,
+                    presentAddress: {
+                        city: inquiry.city,
+                        state: inquiry.state,
+                        address: inquiry.address
+                    },
+                    education10th: inquiry.education10th,
+                    lastExam: inquiry.lastExam,
+                    status: 'Approved'
+                });
+            }
         }
+
+        inquiry.status = status || inquiry.status;
+        inquiry.notes = notes !== undefined ? notes : inquiry.notes;
+        await inquiry.save();
+
+        res.json(inquiry);
     } catch (error) {
-        res.status(400).json({ message: 'Invalid data' });
+        console.error("Update Inquiry Error:", error);
+        res.status(400).json({ message: 'Update protocol failed.' });
     }
 };
 
-// @desc    Delete an inquiry
-// @route   DELETE /api/admission/requests/:id
-// @access  Admin
 const deleteInquiry = async (req, res) => {
     try {
         const inquiry = await AdmissionInquiry.findById(req.params.id);
         if (inquiry) {
             await inquiry.deleteOne();
-            res.json({ message: 'Inquiry removed' });
+            res.json({ message: 'Request purged.' });
         } else {
-            res.status(404).json({ message: 'Inquiry not found' });
+            res.status(404).json({ message: 'Request not identified.' });
         }
     } catch (error) {
-        res.status(500).json({ message: 'Server Error' });
+        res.status(500).json({ message: 'Purge error.' });
     }
 };
 

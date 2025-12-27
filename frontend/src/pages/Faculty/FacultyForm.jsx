@@ -1,298 +1,193 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { X, Upload, Trash2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Upload, User, Mail, Smartphone, Layers, Save, Cpu, Briefcase, MapPin, Calendar, Clock, UserPlus, ChevronDown } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
-const labelClasses = "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1";
+const labelClasses = "block text-[0.6rem] font-black uppercase tracking-[0.2em] text-gray-400 mb-2 ml-1";
+const inputClasses = "w-full p-4 bg-gray-50 dark:bg-gray-800 border-0 rounded-2xl focus:ring-4 focus:ring-primary-500/10 font-bold text-gray-900 dark:text-white shadow-inner transition-all";
 
-const FacultyForm = ({ faculty, onSave, onCancel }) => {
-    const [formData, setFormData] = useState(faculty || { name: '', subject: '', email: '', phone: '', qualification: '', photo: null, assignedStreams: [], assignedSubjects: [] });
+export default function FacultyForm({ faculty, onSave, onCancel }) {
+    const [formData, setFormData] = useState(faculty || { 
+        name: '', email: '', phone: '', subject: '', qualification: '', designation: 'Assistant Professor',
+        department: 'CSE', experienceYears: 0, photo: null, assignedStreams: [], assignedSubjects: [],
+        status: 'Active', joiningDate: new Date().toISOString().split('T')[0],
+        address: { current: '', permanent: '' }
+    });
+    
     const [allStreams, setAllStreams] = useState([]);
     const { api } = useAuth();
-    const [errors, setErrors] = useState({});
     const fileInputRef = useRef(null);
-    const [photoPreview, setPhotoPreview] = useState(faculty?.photo || null);
 
     useEffect(() => {
-        const fetchStreams = async () => {
-            try {
-                const streamsData = await api('/api/streams');
-                setAllStreams(streamsData);
-            } catch (error) {
-                console.error("Failed to fetch stream data", error);
-            }
-        };
-        fetchStreams();
+        api('/api/streams').then(setAllStreams).catch(console.error);
     }, [api]);
-    
-    // Calculate available subjects based on selected streams
-    const availableSubjects = useMemo(() => {
-        if (!formData.assignedStreams || formData.assignedStreams.length === 0 || allStreams.length === 0) {
-            return []; 
-        }
-        const subjects = new Set();
-        allStreams.forEach(stream => {
-            if (formData.assignedStreams.includes(stream.name)) {
-                stream.semesters.forEach(semester => {
-                    semester.subjects.forEach(subject => {
-                        subjects.add(subject.name);
-                    });
-                });
-            }
-        });
-        return Array.from(subjects).sort();
-    }, [allStreams, formData.assignedStreams]);
 
-
-    const validate = () => {
-        const newErrors = {};
-        if (!formData.name.trim()) newErrors.name = 'Name is required.';
-        if (!formData.subject.trim()) newErrors.subject = 'Primary subject is required.';
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-            newErrors.email = 'Please enter a valid email address.';
-        }
-        if (formData.phone && !/^[+]?[(]?[0-9]{1,4}[)]?[-\s./0-9]*$/.test(formData.phone)) {
-            newErrors.phone = 'Please enter a valid phone number.';
-        }
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
-    };
-
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
-        if (errors[name]) {
-            setErrors(prev => ({ ...prev, [name]: null }));
-        }
-    };
-    
     const handleFileChange = (e) => {
         const file = e.target.files[0];
-        if (file && file.type.startsWith("image/")) {
+        if (file) {
             const reader = new FileReader();
-            reader.onloadend = () => {
-                setPhotoPreview(reader.result);
-                setFormData(prev => ({ ...prev, photo: reader.result }));
-            };
+            reader.onloadend = () => setFormData(prev => ({ ...prev, photo: reader.result }));
             reader.readAsDataURL(file);
         }
     };
 
-    const handleRemovePhoto = () => {
-        setPhotoPreview(null);
-        setFormData(prev => ({ ...prev, photo: null }));
-        if(fileInputRef.current) fileInputRef.current.value = "";
-    };
-
-    // --- Stream Handling ---
-    const handleAddStream = (e) => {
-        const newStream = e.target.value;
-        if (newStream && !(formData.assignedStreams || []).includes(newStream)) {
-            setFormData(prev => ({ 
-                ...prev, 
-                assignedStreams: [...(prev.assignedStreams || []), newStream] 
-            }));
-        }
-        e.target.value = ""; 
-    };
-
-    const removeStream = (streamToRemove) => {
+    const handleToggle = (listName, item) => {
         setFormData(prev => {
-            const newStreams = (prev.assignedStreams || []).filter(s => s !== streamToRemove);
-            
-            // Re-validate subjects: remove subjects that are no longer available in the remaining streams
-            const validSubjects = new Set();
-            allStreams.forEach(stream => {
-                if (newStreams.includes(stream.name)) {
-                    stream.semesters.forEach(semester => {
-                        semester.subjects.forEach(subject => {
-                            validSubjects.add(subject.name);
-                        });
-                    });
-                }
-            });
-            
-            const newAssignedSubjects = (prev.assignedSubjects || []).filter(assignedSub => 
-                validSubjects.has(assignedSub)
-            );
-    
-            return {
-                ...prev,
-                assignedStreams: newStreams,
-                assignedSubjects: newAssignedSubjects,
-            };
+            const list = [...(prev[listName] || [])];
+            const idx = list.indexOf(item);
+            if (idx > -1) list.splice(idx, 1);
+            else list.push(item);
+            return { ...prev, [listName]: list };
         });
-    };
-
-    // --- Subject Handling ---
-    const handleAddSubject = (e) => {
-        const newSubject = e.target.value;
-        if (newSubject && !(formData.assignedSubjects || []).includes(newSubject)) {
-            setFormData(prev => ({ 
-                ...prev, 
-                assignedSubjects: [...(prev.assignedSubjects || []), newSubject] 
-            }));
-        }
-        e.target.value = "";
-    };
-    
-    const removeSubject = (subjectToRemove) => {
-        setFormData(prev => ({
-            ...prev,
-            assignedSubjects: (prev.assignedSubjects || []).filter(s => s !== subjectToRemove)
-        }));
     };
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        if (validate()) {
-            onSave(formData);
-        }
+        onSave(formData);
     };
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4">
-            <div className="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-                <h2 className="text-2xl font-bold mb-6 text-gray-800 dark:text-gray-100">{faculty ? 'Edit Faculty' : 'Add New Faculty'}</h2>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="md:col-span-1">
-                             <label className={labelClasses}>Profile Photo</label>
-                             <div className="mt-2 flex flex-col items-center gap-4">
-                                 <img 
-                                     src={photoPreview || `https://api.dicebear.com/8.x/initials/svg?seed=${formData.name || 'A'}`} 
-                                     alt="Profile preview" 
-                                     className="w-24 h-24 rounded-full object-cover bg-gray-200 dark:bg-gray-700"
-                                 />
-                                 <input 
-                                     type="file" 
-                                     ref={fileInputRef} 
-                                     onChange={handleFileChange} 
-                                     accept="image/*" 
-                                     className="hidden" 
-                                 />
-                                 <div className="flex gap-2">
-                                    <button 
-                                        type="button" 
-                                        onClick={() => fileInputRef.current?.click()} 
-                                        className="py-1 px-3 border border-gray-300 dark:border-gray-600 rounded-md text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-                                    >
-                                        Change
-                                    </button>
-                                    {photoPreview && (
-                                        <button 
-                                            type="button" 
-                                            onClick={handleRemovePhoto}
-                                            className="py-1 px-3 border border-transparent rounded-md text-xs font-medium text-red-700 hover:bg-red-50 dark:hover:bg-red-900/40"
-                                        >
-                                            Remove
-                                        </button>
-                                    )}
-                                 </div>
-                             </div>
+        <div className="fixed inset-0 bg-gray-950/95 backdrop-blur-xl flex justify-center items-center z-[300] p-4">
+            <div className="bg-white dark:bg-gray-900 rounded-[3.5rem] shadow-3xl w-full max-w-5xl h-[92vh] flex flex-col border border-white/10 animate-scale-in">
+                
+                <div className="p-10 border-b dark:border-gray-800 flex items-center justify-between bg-white dark:bg-gray-900 z-20">
+                    <div className="flex items-center gap-6">
+                        <div className="p-4 bg-primary-600 rounded-3xl text-white shadow-2xl shadow-primary-500/40">
+                            <UserPlus size={32} />
                         </div>
-                        <div className="md:col-span-2 space-y-4">
-                             <div>
-                                <label className={labelClasses}>Full Name</label>
-                                <input name="name" value={formData.name} onChange={handleChange} placeholder="John Doe" className="w-full p-2 border rounded bg-gray-50 dark:bg-gray-700" required />
-                                {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
-                            </div>
-                            <div>
-                                <label className={labelClasses}>Primary Subject Expertise</label>
-                                <input name="subject" value={formData.subject} onChange={handleChange} placeholder="e.g. Mathematics" className="w-full p-2 border rounded bg-gray-50 dark:bg-gray-700" required />
-                                {errors.subject && <p className="text-red-500 text-xs mt-1">{errors.subject}</p>}
-                            </div>
-                            <div>
-                                <label className={labelClasses}>Email Address</label>
-                                <input name="email" type="email" value={formData.email} onChange={handleChange} placeholder="john@example.com" className="w-full p-2 border rounded bg-gray-50 dark:bg-gray-700" required />
-                                {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
-                            </div>
-                            <div>
-                                <label className={labelClasses}>Phone Number</label>
-                                <input name="phone" type="tel" value={formData.phone} onChange={handleChange} placeholder="+1 234 567 890" className="w-full p-2 border rounded bg-gray-50 dark:bg-gray-700" />
-                                {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
-                            </div>
+                        <div>
+                            <h2 className="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tighter leading-none">
+                                Expert <span className="text-primary-600">Calibration</span>
+                            </h2>
+                            <p className="text-[0.6rem] font-bold text-gray-400 uppercase tracking-[0.5em] mt-3">Neural Asset Onboarding Sequence</p>
                         </div>
                     </div>
-                    <div>
-                        <label className={labelClasses}>Qualifications</label>
-                        <textarea name="qualification" value={formData.qualification} onChange={handleChange} placeholder="PhD in Computer Science..." className="w-full p-2 border rounded bg-gray-50 dark:bg-gray-700" rows="3"/>
-                    </div>
+                    <button onClick={onCancel} className="p-4 bg-gray-50 dark:bg-gray-800 text-gray-400 hover:text-red-500 rounded-3xl transition-all active:scale-90"><X size={28} /></button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="flex-grow overflow-y-auto p-12 scrollbar-hide space-y-12 pb-32">
                     
-                    {/* Assigned Streams Section */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Assigned Streams</label>
-                        <div className="flex flex-wrap gap-2 p-3 border rounded-md bg-gray-50 dark:bg-gray-700 items-start min-h-[50px] mb-2">
-                            {(formData.assignedStreams || []).length > 0 ? (
-                                formData.assignedStreams.map(c => (
-                                    <span key={c} className="flex items-center gap-1.5 px-3 py-1 bg-primary-100 dark:bg-primary-900/50 text-primary-800 dark:text-primary-200 text-sm rounded-full">
-                                        {c}
-                                        <button type="button" onClick={() => removeStream(c)} className="text-primary-600 dark:text-primary-300 hover:text-primary-800 dark:hover:text-primary-100">
-                                            <X size={14} />
-                                        </button>
-                                    </span>
-                                ))
-                            ) : (
-                                <span className="text-gray-400 text-sm italic py-1">No streams assigned.</span>
-                            )}
+                    {/* Layer 01: Core Identity */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 bg-gray-50/50 dark:bg-gray-950/30 p-10 rounded-[3rem] border border-gray-100 dark:border-gray-800 shadow-inner">
+                        <div className="lg:col-span-3 flex flex-col items-center gap-6">
+                            <div className="w-48 h-48 rounded-[3rem] bg-white dark:bg-gray-950 border-4 border-dashed border-gray-200 dark:border-gray-800 flex items-center justify-center overflow-hidden group relative shadow-2xl">
+                                {formData.photo ? <img src={formData.photo} className="w-full h-full object-cover" /> : <User size={64} className="text-gray-200" />}
+                                <button type="button" onClick={() => fileInputRef.current.click()} className="absolute inset-0 bg-primary-600/90 opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-center text-white">
+                                    <Upload size={28} />
+                                    <span className="text-[0.5rem] font-black uppercase tracking-widest mt-2">Sync Identity</span>
+                                </button>
+                            </div>
+                            <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
                         </div>
-                        <select 
-                            onChange={handleAddStream} 
-                            className="w-full p-2 border rounded bg-white dark:bg-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                        >
-                            <option value="">+ Add Stream...</option>
-                            {allStreams
-                                .filter(s => !(formData.assignedStreams || []).includes(s.name))
-                                .map(s => <option key={s._id} value={s.name}>{s.name}</option>)
-                            }
-                        </select>
-                        {errors.assignedStreams && <p className="text-red-500 text-xs mt-1">{errors.assignedStreams}</p>}
+                        
+                        <div className="lg:col-span-9 grid grid-cols-1 sm:grid-cols-2 gap-6">
+                            <div className="sm:col-span-2">
+                                <label className={labelClasses}>Full Legal Name</label>
+                                <input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className={inputClasses} placeholder="Dr. Sarah Connor" required />
+                            </div>
+                            <div className="space-y-6">
+                                <div>
+                                    <label className={labelClasses}>Primary Expertise</label>
+                                    <input value={formData.subject} onChange={e => setFormData({...formData, subject: e.target.value})} className={inputClasses} placeholder="Quantum Mechanics" required />
+                                </div>
+                                <div>
+                                    <label className={labelClasses}>Institutional Email</label>
+                                    <input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className={inputClasses} placeholder="sarah@aiet.ac.in" required />
+                                </div>
+                            </div>
+                            <div className="space-y-6">
+                                <div>
+                                    <label className={labelClasses}>Mobile Node</label>
+                                    <input value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className={inputClasses} placeholder="+91 9876543210" required />
+                                </div>
+                                <div>
+                                    <label className={labelClasses}>Credentials</label>
+                                    <input value={formData.qualification} onChange={e => setFormData({...formData, qualification: e.target.value})} className={inputClasses} placeholder="PhD in Neural Networks" required />
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
-                    {/* Assigned Subjects Section */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Assigned Subjects</label>
-                        <div className="flex flex-wrap gap-2 p-3 border rounded-md bg-gray-50 dark:bg-gray-700 items-start min-h-[50px] mb-2">
-                            {(formData.assignedSubjects || []).length > 0 ? (
-                                formData.assignedSubjects.map(s => (
-                                    <span key={s} className="flex items-center gap-1.5 px-3 py-1 bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200 text-sm rounded-full">
+                    {/* Layer 02: Professional Matrix */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                        <div>
+                            <label className={labelClasses}>Designation</label>
+                            <select value={formData.designation} onChange={e => setFormData({...formData, designation: e.target.value})} className={inputClasses}>
+                                <option>Assistant Professor</option>
+                                <option>Associate Professor</option>
+                                <option>Professor</option>
+                                <option>Head of Department</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className={labelClasses}>Department Hub</label>
+                            <select value={formData.department} onChange={e => setFormData({...formData, department: e.target.value})} className={inputClasses}>
+                                <option>CSE</option><option>ECE</option><option>EEE</option><option>MECH</option><option>CIVIL</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className={labelClasses}>Exp Node (Years)</label>
+                            <input type="number" value={formData.experienceYears} onChange={e => setFormData({...formData, experienceYears: e.target.value})} className={inputClasses} />
+                        </div>
+                    </div>
+
+                    {/* Layer 03: Allocation Lattice */}
+                    <div className="p-10 rounded-[3rem] bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-sm">
+                        <h3 className="text-xl font-black text-gray-900 dark:text-white uppercase tracking-tighter mb-8 flex items-center gap-4">
+                            <Layers className="text-primary-500" /> Assigned Stream Matrix
+                        </h3>
+                        <div className="flex flex-wrap gap-3">
+                            {allStreams.map(stream => (
+                                <button
+                                    key={stream._id}
+                                    type="button"
+                                    onClick={() => handleToggle('assignedStreams', stream.name)}
+                                    className={`px-6 py-3 rounded-2xl text-[0.65rem] font-black uppercase tracking-widest transition-all ${
+                                        formData.assignedStreams.includes(stream.name)
+                                        ? 'bg-primary-600 text-white shadow-xl shadow-primary-500/30'
+                                        : 'bg-gray-100 dark:bg-gray-800 text-gray-500 hover:bg-gray-200'
+                                    }`}
+                                >
+                                    {stream.name}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Layer 04: Spatial Data */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                        <div>
+                            <label className={labelClasses}>Present Coordinate (Address)</label>
+                            <textarea value={formData.address.current} onChange={e => setFormData({...formData, address: {...formData.address, current: e.target.value}})} className={`${inputClasses} h-32 resize-none`} placeholder="Bhubaneswar HQ..." />
+                        </div>
+                        <div>
+                            <label className={labelClasses}>Registry Status</label>
+                            <div className="flex gap-4 mb-6">
+                                {['Active', 'On Leave', 'Resigned'].map(s => (
+                                    <button
+                                        key={s}
+                                        type="button"
+                                        onClick={() => setFormData({...formData, status: s})}
+                                        className={`flex-1 py-3 rounded-xl text-[0.6rem] font-black uppercase tracking-widest transition-all ${
+                                            formData.status === s ? 'bg-accent-500 text-white shadow-lg' : 'bg-gray-100 dark:bg-gray-800 text-gray-400'
+                                        }`}
+                                    >
                                         {s}
-                                        <button type="button" onClick={() => removeSubject(s)} className="text-green-600 dark:text-green-300 hover:text-green-800 dark:hover:text-green-100">
-                                            <X size={14} />
-                                        </button>
-                                    </span>
-                                ))
-                            ) : (
-                                <span className="text-gray-400 text-sm italic py-1">No subjects assigned.</span>
-                            )}
+                                    </button>
+                                ))}
+                            </div>
+                            <label className={labelClasses}>Node Activation Date</label>
+                            <input type="date" value={formData.joiningDate} onChange={e => setFormData({...formData, joiningDate: e.target.value})} className={inputClasses} />
                         </div>
-                        <select 
-                            onChange={handleAddSubject} 
-                            className="w-full p-2 border rounded bg-white dark:bg-gray-600 text-sm disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                            disabled={!formData.assignedStreams || formData.assignedStreams.length === 0}
-                        >
-                            <option value="">
-                                {(!formData.assignedStreams || formData.assignedStreams.length === 0) 
-                                    ? "Select a stream first to see subjects..." 
-                                    : "+ Add Subject..."
-                                }
-                            </option>
-                            {availableSubjects
-                                .filter(s => !(formData.assignedSubjects || []).includes(s))
-                                .map(s => <option key={s} value={s}>{s}</option>)
-                            }
-                        </select>
-                        <p className="text-xs text-gray-500 mt-1 dark:text-gray-400">Subjects are filtered based on the assigned streams above.</p>
-                        {errors.assignedSubjects && <p className="text-red-500 text-xs mt-1">{errors.assignedSubjects}</p>}
-                    </div>
-
-                    <div className="flex justify-end gap-4 mt-6 pt-4 border-t dark:border-gray-700">
-                        <button type="button" onClick={onCancel} className="px-4 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 text-gray-800 dark:text-white rounded">Cancel</button>
-                        <button type="submit" className="px-6 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded font-medium">Save Details</button>
                     </div>
                 </form>
+
+                <div className="p-10 border-t dark:border-gray-800 flex justify-end gap-6 bg-white/80 dark:bg-gray-900/80 backdrop-blur-2xl rounded-b-[3.5rem] z-20 shadow-3xl">
+                    <button type="button" onClick={onCancel} className="px-10 py-4 text-gray-500 font-black uppercase text-[0.7rem] tracking-widest hover:text-red-500 transition-all">Abort Sequence</button>
+                    <button onClick={handleSubmit} className="px-14 py-4 bg-primary-600 text-white font-black uppercase text-[0.7rem] tracking-[0.3em] rounded-3xl hover:bg-primary-700 shadow-2xl shadow-primary-500/40 active:scale-95 transition-all flex items-center gap-3 group">
+                        <Save size={18} className="group-hover:rotate-12 transition-transform" /> Commit Update
+                    </button>
+                </div>
             </div>
         </div>
     );
-};
-
-export default FacultyForm;
+}

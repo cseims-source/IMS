@@ -1,442 +1,380 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { User, Mail, Phone, Home, GraduationCap, BarChart2, CheckCircle, Calendar, X, Download, Eye, Award, Image as ImageIcon, DollarSign, Bookmark } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { 
+    User, Mail, Phone, Home, GraduationCap, BarChart2, 
+    CheckCircle, Calendar, X, Download, Eye, Award, 
+    Image as ImageIcon, DollarSign, Bookmark, Shield, 
+    Users, MapPin, Trophy, Fingerprint, KeyRound, 
+    CheckCircle2, AlertCircle, Loader2, Smartphone,
+    Bus, ClipboardCheck, MessageSquare, Save, RefreshCw, FileDown,
+    Clock, ShieldCheck, UserCog, Database, BookOpen, ShieldAlert, Landmark, Activity
+} from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, AreaChart, Area } from 'recharts';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { formatDate } from '../../utils/dateFormatter';
 import { useNotification } from '../../contexts/NotificationContext';
+import Spinner from '../../components/Spinner';
 
-
-const InfoItem = ({ icon, label, value }) => (
-    <div className="flex items-start text-gray-600 dark:text-gray-300">
-        <div className="mr-4 mt-1 text-gray-400">{icon}</div>
+const InfoBit = ({ icon: Icon, label, value, color = "text-primary-500" }) => (
+    <div className="flex items-start text-gray-600 dark:text-gray-300 p-5 bg-white dark:bg-gray-800 rounded-[2rem] border border-gray-100 dark:border-gray-700 hover:shadow-xl transition-all group">
+        <div className={`mr-4 p-3 bg-gray-50 dark:bg-gray-900 rounded-2xl shadow-inner ${color} group-hover:scale-110 transition-transform`}>
+            <Icon size={18} />
+        </div>
         <div>
-            <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
-            <p className="font-medium text-gray-800 dark:text-gray-100">{value || 'N/A'}</p>
+            <p className="text-[0.6rem] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1">{label}</p>
+            <p className="text-xs font-bold text-gray-900 dark:text-gray-100">{value || '---'}</p>
         </div>
     </div>
 );
 
-const LoadingCard = ({ title, icon, lines = 3 }) => (
-    <Card title={title} icon={icon}>
-        {Array.from({ length: lines }).map((_, i) => (
-             <div key={i} className="h-8 bg-gray-200 dark:bg-gray-700 rounded-md animate-pulse"></div>
-        ))}
-    </Card>
+const TabButton = ({ active, onClick, icon: Icon, label }) => (
+    <button
+        onClick={onClick}
+        className={`flex items-center gap-3 px-8 py-4 rounded-[1.5rem] font-black uppercase text-[0.65rem] tracking-[0.2em] transition-all duration-500 relative overflow-hidden ${
+            active 
+            ? 'bg-primary-600 text-white shadow-2xl shadow-primary-500/30 -translate-y-1' 
+            : 'bg-white dark:bg-gray-900 text-gray-400 hover:text-primary-600 border border-gray-100 dark:border-gray-800'
+        }`}
+    >
+        {active && <div className="absolute inset-0 bg-white/10 animate-pulse-glow" />}
+        <Icon size={16} className="relative z-10" />
+        <span className="relative z-10">{label}</span>
+    </button>
 );
 
-const MarksheetModal = ({ marksheet, student, onClose }) => {
-    const marksheetRef = useRef(null);
-
-    const downloadPdf = () => {
-        if (!marksheetRef.current) return;
-        
-        html2canvas(marksheetRef.current, { scale: 2, backgroundColor: '#ffffff' }).then(canvas => {
-            const imgData = canvas.toDataURL('image/png');
-            const pdf = new jsPDF({
-                orientation: 'p',
-                unit: 'px',
-                format: [canvas.width + 40, canvas.height + 40]
-            });
-            pdf.addImage(imgData, 'PNG', 20, 20, canvas.width, canvas.height);
-            pdf.save(`Marksheet-${student.firstName}-${marksheet.exam}.pdf`);
-        });
-    };
-
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-full max-w-2xl">
-                <div className="p-6">
-                    <div className="flex justify-between items-center mb-4">
-                        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Marksheet Details</h2>
-                        <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"><X size={20}/></button>
-                    </div>
-                    <div ref={marksheetRef} className="p-6 bg-white rounded-lg text-gray-800">
-                        <div className="text-center mb-6">
-                            <h3 className="text-xl font-bold">Institute of Technology</h3>
-                            <p className="text-lg font-semibold capitalize">{marksheet.exam.replace('-', ' ')} Exam Marksheet</p>
-                        </div>
-                        <div className="flex justify-between text-sm mb-6">
-                            <p><strong>Student:</strong> {student.firstName} {student.lastName}</p>
-                            <p><strong>Stream:</strong> {student.stream}</p>
-                        </div>
-                        <table className="w-full text-left">
-                            <thead className="bg-gray-200">
-                                <tr>
-                                    <th className="p-3 font-semibold">Subject</th>
-                                    <th className="p-3 font-semibold text-center">Marks Obtained</th>
-                                    <th className="p-3 font-semibold text-center">Max Marks</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {marksheet.marks.map((m, i) => (
-                                    <tr key={i} className="border-b">
-                                        <td className="p-3">{m.subjectName}</td>
-                                        <td className="p-3 text-center">{m.marksObtained}</td>
-                                        <td className="p-3 text-center">{m.maxMarks}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                        <div className="mt-6 flex justify-end">
-                            <div className="w-1/2 bg-primary-50 p-4 rounded-lg">
-                                <div className="flex justify-between text-sm"><span>Total Marks:</span> <strong>{marksheet.total}</strong></div>
-                                <div className="flex justify-between text-sm"><span>Percentage:</span> <strong>{marksheet.percentage}%</strong></div>
-                                <div className="flex justify-between font-bold text-md mt-2"><span>Grade:</span> <strong>{marksheet.grade}</strong></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                 <div className="p-4 bg-gray-100 dark:bg-gray-900 rounded-b-lg flex justify-end">
-                    <button onClick={downloadPdf} className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
-                        <Download size={16} className="mr-2"/> Download as PDF
-                    </button>
-                </div>
-            </div>
+const SectionHeader = ({ icon: Icon, num, title, subtitle }) => (
+    <div className="flex items-center gap-4 mb-8">
+        <div className="w-10 h-10 rounded-2xl bg-primary-600 text-white flex items-center justify-center font-black text-xs shadow-lg">{num}</div>
+        <div>
+            <h3 className="text-lg font-black text-gray-900 dark:text-white uppercase tracking-tighter flex items-center gap-2">
+                <Icon size={20} className="text-primary-500" /> {title}
+            </h3>
+            <p className="text-[0.55rem] font-bold text-gray-400 uppercase tracking-[0.4em]">{subtitle}</p>
         </div>
-    );
-}
-
-const AttendanceModal = ({ attendance, onClose }) => {
-    const recentAttendance = [...attendance].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 30);
-
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-full max-w-lg">
-                <div className="p-6">
-                    <div className="flex justify-between items-center mb-4">
-                        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Attendance History</h2>
-                        <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"><X size={20}/></button>
-                    </div>
-                    <div className="max-h-96 overflow-y-auto">
-                        <ul className="space-y-2">
-                            {recentAttendance.map(record => (
-                                <li key={record._id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700/50 rounded-md">
-                                    <div className="flex items-center">
-                                        <Calendar size={18} className="mr-3 text-gray-500" />
-                                        <span className="font-medium">{formatDate(record.date)}</span>
-                                    </div>
-                                    {record.status === 'present' ? (
-                                        <span className="px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300">Present</span>
-                                    ) : (
-                                        <span className="px-3 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300">Absent</span>
-                                    )}
-                                </li>
-                            ))}
-                        </ul>
-                        {attendance.length > 30 && <p className="text-center text-sm text-gray-500 mt-4">Showing most recent 30 records.</p>}
-                        {attendance.length === 0 && <p className="text-center text-gray-500 py-10">No attendance records found.</p>}
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
+    </div>
+);
 
 export default function StudentProfile() {
   const [student, setStudent] = useState(null);
-  const [attendance, setAttendance] = useState(null);
-  const [academics, setAcademics] = useState(null);
-  const [fees, setFees] = useState(null);
-  const [loading, setLoading] = useState({ profile: true, attendance: true, academics: true, fees: true });
-  const [viewingMarksheet, setViewingMarksheet] = useState(null);
-  const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
-  const [selectedPhoto, setSelectedPhoto] = useState(null);
-  const [isUploading, setIsUploading] = useState(false);
+  const [activeTab, setActiveTab] = useState('DOSSIER');
+  const [loading, setLoading] = useState(true);
   const { api } = useAuth();
   const { addToast } = useNotification();
-  const fileInputRef = useRef(null);
+  const dossierRef = useRef(null);
+
+  const [passwords, setPasswords] = useState({ old: '', new: '', confirm: '' });
+  const [updatingSecurity, setUpdatingSecurity] = useState(false);
 
   useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const data = await api('/api/students/profile');
-        setStudent(data);
-      } catch (error) {
-        console.error("Failed to fetch student profile", error);
-      } finally {
-        setLoading(prev => ({...prev, profile: false}));
-      }
-    };
-    const fetchAttendance = async () => {
-       try {
-        const data = await api('/api/attendance/my-records');
-        setAttendance(data);
-      } catch (error) {
-        console.error("Failed to fetch attendance", error);
-        setAttendance([]);
-      } finally {
-        setLoading(prev => ({...prev, attendance: false}));
-      }
-    };
-    const fetchAcademics = async () => {
-        try {
-            const data = await api('/api/marksheet/my-marksheets');
-            setAcademics(data);
-        } catch (error) {
-            console.error("Failed to fetch academics", error);
-            setAcademics([]);
-        } finally {
-            setLoading(prev => ({...prev, academics: false}));
-        }
-    }
-    const fetchFees = async () => {
-        try {
-            const data = await api('/api/students/profile/fees');
-            setFees(data);
-        } catch (error) {
-            console.error("Failed to fetch fees", error);
-            setFees([]);
-        } finally {
-            setLoading(prev => ({...prev, fees: false}));
-        }
-    }
-
     fetchProfile();
-    fetchAttendance();
-    fetchAcademics();
-    fetchFees();
   }, [api]);
 
-  const handleFileSelect = (e) => {
-    const file = e.target.files[0];
-    if (file && file.type.startsWith("image/")) {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-            setSelectedPhoto(reader.result);
-        };
-        reader.readAsDataURL(file);
-    }
-  };
-
-  const handleSavePhoto = async () => {
-    if (!selectedPhoto) return;
-    setIsUploading(true);
+  const fetchProfile = async () => {
+    setLoading(true);
     try {
-        const updatedStudent = await api('/api/students/profile/photo', {
-            method: 'PUT',
-            body: JSON.stringify({ photo: selectedPhoto })
-        });
-        setStudent(updatedStudent);
-        setSelectedPhoto(null);
-        addToast("Profile photo updated successfully!", "success");
+      const data = await api('/api/students/profile');
+      setStudent(data);
     } catch (error) {
-        console.error("Failed to upload photo", error);
-        addToast("Photo upload failed.", "error");
+      addToast("Failed to sync neural profile.", "error");
     } finally {
-        setIsUploading(false);
+      setLoading(false);
     }
   };
 
-  const handleCancelUpload = () => {
-    setSelectedPhoto(null);
-    if(fileInputRef.current) {
-        fileInputRef.current.value = "";
-    }
-  };
-
-  const attendanceSummary = useMemo(() => {
-    if (!attendance) return { overall: '0', total: 0 };
-    const totalDays = attendance.length;
-    if (totalDays === 0) return { overall: 'N/A', total: 0 };
-    const presentDays = attendance.filter(a => a.status === 'present').length;
-    const percentage = ((presentDays / totalDays) * 100).toFixed(1);
-    return { overall: percentage, total: totalDays };
-  }, [attendance]);
-
-  const academicSummary = useMemo(() => {
-    if (!academics || academics.length === 0) return { gpa: 'N/A', performance: [], exams: [] };
-
-    const subjectDataMap = {};
-    const examSet = new Set();
-    const colors = ['#16a34a', '#22c55e', '#4ade80', '#15803d', '#166534']; // Shades of primary green
-
-    academics.forEach(marksheet => {
-        const examName = marksheet.exam.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase());
-        examSet.add(examName);
-        marksheet.marks.forEach(mark => {
-            if (!subjectDataMap[mark.subjectName]) {
-                subjectDataMap[mark.subjectName] = { 
-                    subject: mark.subjectName, 
-                    maxMarks: mark.maxMarks 
-                };
-            }
-            subjectDataMap[mark.subjectName][examName] = mark.marksObtained;
+  const handleUpdatePassword = async (e) => {
+    e.preventDefault();
+    if (passwords.new !== passwords.confirm) return addToast('New passwords mismatch.', 'error');
+    setUpdatingSecurity(true);
+    try {
+        await api('/api/users/profile/password', {
+            method: 'PUT',
+            body: JSON.stringify({ oldPassword: passwords.old, newPassword: passwords.new })
         });
-    });
+        addToast('Access keys rotated successfully!', 'success');
+        setPasswords({ old: '', new: '', confirm: '' });
+    } catch (err) {
+        addToast(err.message, 'error');
+    } finally { setUpdatingSecurity(false); }
+  };
 
-    const performanceData = Object.values(subjectDataMap);
-    const exams = Array.from(examSet).map((exam, index) => ({
-        name: exam,
-        color: colors[index % colors.length]
-    }));
+  const downloadFullDossier = async () => {
+      if (!dossierRef.current) return;
+      addToast("Synthesizing PDF dossier...", "info");
+      const canvas = await html2canvas(dossierRef.current, { scale: 2 });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgProps = pdf.getImageProperties(imgData);
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`AIET_Dossier_${student.firstName}.pdf`);
+      addToast("Registry document generated!", "success");
+  };
 
-    const avgPercentage = academics.length > 0 ? academics.reduce((acc, m) => acc + m.percentage, 0) / academics.length : 0;
-    const gpa = (avgPercentage / 25).toFixed(2);
+  if (loading) return (
+    <div className="h-[70vh] flex flex-col items-center justify-center gap-6">
+        <RefreshCw className="animate-spin text-primary-500" size={48} />
+        <p className="font-black uppercase tracking-[0.4em] text-gray-400 animate-pulse text-xs">Accessing Private Node Registry...</p>
+    </div>
+  );
 
-    return { gpa, performance: performanceData, exams };
-  }, [academics]);
+  if (!student) return <div className="text-center p-20 font-black text-red-500 uppercase tracking-[0.5em]">Identity Trace Terminated. Contact Admin Node.</div>;
 
-  if (loading.profile) {
-    return <div className="text-center p-8">Loading profile...</div>;
-  }
-
-  if (!student) {
-    return <div className="text-center p-8 text-red-500">Could not load student profile. Your profile may need to be completed by an administrator.</div>;
-  }
-  
-  const photoUrl = selectedPhoto || student.photo || `https://api.dicebear.com/8.x/initials/svg?seed=${student.firstName}%20${student.lastName}`;
+  const photoUrl = student.photo || `https://api.dicebear.com/8.x/initials/svg?seed=${student.firstName}`;
 
   return (
-    <div>
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg mb-6">
-            <div className="flex flex-col sm:flex-row items-center">
-                <div className="relative w-24 h-24 mr-0 sm:mr-6 mb-4 sm:mb-0 group">
-                    <img src={photoUrl} alt="Student" className="w-24 h-24 rounded-full border-4 border-primary-200 object-cover" />
-                    <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept="image/*" className="hidden" />
-                    <button 
-                        onClick={() => fileInputRef.current.click()} 
-                        className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 flex items-center justify-center rounded-full transition-opacity"
-                        aria-label="Change profile picture"
-                    >
-                        <ImageIcon size={24} className="text-white opacity-0 group-hover:opacity-100 transition-opacity"/>
-                    </button>
+    <div className="space-y-8 animate-fade-in max-w-[1600px] mx-auto pb-24">
+        {/* Profile Header Block */}
+        <div className="bg-white dark:bg-gray-900 p-10 rounded-[4rem] shadow-2xl border border-white/20 dark:border-gray-800 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-96 h-96 bg-primary-600/5 blur-[120px] -mr-32 -mt-32" />
+            <div className="flex flex-col md:flex-row items-center gap-12 relative z-10">
+                <div className="relative">
+                    <div className="w-36 h-36 rounded-[3rem] bg-gray-50 dark:bg-gray-800 border-4 border-white dark:border-gray-700 shadow-2xl overflow-hidden group-hover:scale-105 transition-transform duration-700">
+                        <img src={photoUrl} className="w-full h-full object-cover" alt="Node Avatar" />
+                    </div>
+                    <div className="absolute -bottom-2 -right-2 bg-accent-500 text-white p-2.5 rounded-[1.2rem] shadow-2xl border-4 border-white dark:border-gray-900 animate-float">
+                        <Fingerprint size={20} />
+                    </div>
                 </div>
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100 text-center sm:text-left">{student.firstName} {student.lastName}</h1>
-                    <p className="text-gray-600 dark:text-gray-400 text-center sm:text-left">{student.stream} | ID: {student._id.slice(-6).toUpperCase()}</p>
-                    {selectedPhoto && (
-                        <div className="mt-2 flex justify-center sm:justify-start gap-2">
-                            <button onClick={handleSavePhoto} disabled={isUploading} className="px-3 py-1 bg-green-600 text-white rounded-md text-sm hover:bg-green-700 disabled:bg-green-400">
-                                {isUploading ? 'Saving...' : 'Save'}
-                            </button>
-                            <button onClick={handleCancelUpload} className="px-3 py-1 bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-100 rounded-md text-sm hover:bg-gray-300 dark:hover:bg-gray-500">
-                                Cancel
-                            </button>
+                <div className="text-center md:text-left flex-grow">
+                    <div className="flex items-center gap-4 mb-4 justify-center md:justify-start">
+                        <span className={`px-4 py-1.5 rounded-full text-[0.55rem] font-black uppercase tracking-widest shadow-sm ${student.status === 'Approved' ? 'bg-accent-100 text-accent-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                            Registry: {student.status}
+                        </span>
+                        <span className="text-[0.65rem] font-mono text-gray-400 font-bold uppercase">Node-ID: {student._id.slice(-8).toUpperCase()}</span>
+                    </div>
+                    <h1 className="text-4xl font-black text-gray-900 dark:text-white uppercase tracking-tighter leading-tight mb-4">
+                        {student.firstName} <span className="text-primary-600">{student.lastName}</span>
+                    </h1>
+                    <div className="flex flex-wrap justify-center md:justify-start gap-4">
+                        <div className="flex items-center gap-3 px-6 py-2 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700">
+                            <GraduationCap size={14} className="text-primary-500" />
+                            <span className="text-[0.65rem] font-black uppercase tracking-widest text-gray-700 dark:text-gray-200">{student.course} • {student.branch}</span>
                         </div>
-                    )}
+                        <div className="flex items-center gap-3 px-6 py-2 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700">
+                            <Clock size={14} className="text-primary-500" />
+                            <span className="text-[0.65rem] font-black uppercase tracking-widest text-gray-700 dark:text-gray-200">Semester {student.currentSemester}</span>
+                        </div>
+                    </div>
                 </div>
+                <button onClick={downloadFullDossier} className="flex flex-col items-center gap-2 p-6 bg-primary-600/5 hover:bg-primary-600/10 rounded-[2.5rem] border border-primary-500/10 transition-all active:scale-95 group">
+                    <FileDown size={28} className="text-primary-600 group-hover:translate-y-1 transition-transform" />
+                    <span className="text-[0.55rem] font-black uppercase tracking-widest text-primary-700">Export Registry</span>
+                </button>
             </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-1 space-y-6">
-                <Card title="Personal Information" icon={<User />}>
-                    <InfoItem icon={<Mail size={20} />} label="Email" value={student.email} />
-                    <InfoItem icon={<Phone size={20} />} label="Phone" value={student.phone} />
-                    <InfoItem icon={<Calendar size={20} />} label="Date of Birth" value={formatDate(student.dob)} />
-                    <InfoItem icon={<Home size={20} />} label="Address" value={student.address} />
-                    <InfoItem icon={<GraduationCap size={20} />} label="Stream" value={student.stream} />
-                    <InfoItem icon={<Bookmark size={20} />} label="Current Semester" value={student.currentSemester} />
-                </Card>
-                {loading.attendance ? <LoadingCard title="Attendance" icon={<CheckCircle />} /> : (
-                 <Card title="Attendance Summary" icon={<CheckCircle />}>
-                     <div className="text-center mb-4">
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Overall Percentage</p>
-                        <p className="text-4xl font-bold text-green-600">{attendanceSummary.overall}%</p>
-                     </div>
-                     <p className="text-center text-xs text-gray-500 dark:text-gray-400">Based on {attendanceSummary.total} recorded days.</p>
-                     <div className="mt-4 border-t dark:border-gray-700 pt-4 text-center">
-                        <button
-                            onClick={() => setIsAttendanceModalOpen(true)}
-                            className="inline-flex items-center text-sm font-semibold text-primary-600 dark:text-primary-400 hover:underline"
-                        >
-                            <Calendar size={14} className="mr-1.5"/> View Full History
-                        </button>
-                    </div>
-                 </Card>
-                )}
-                 {loading.fees ? <LoadingCard title="My Fees" icon={<DollarSign />} /> : (
-                    <Card title="My Fees" icon={<DollarSign />}>
-                         {fees && fees.length > 0 ? (
-                            <div className="space-y-3">
-                                {fees.map(fee => (
-                                    <div key={fee._id} className="flex justify-between items-center text-sm p-3 bg-gray-50 dark:bg-gray-700/50 rounded-md">
-                                        <div>
-                                            <p className="font-medium">{fee.type}</p>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400">Due: {formatDate(fee.dueDate)}</p>
+        {/* Tab Selection */}
+        <div className="flex flex-wrap gap-4 justify-center md:justify-start px-2">
+            <TabButton active={activeTab === 'DOSSIER'} onClick={() => setActiveTab('DOSSIER')} icon={Database} label="Registry Dossier" />
+            <TabButton active={activeTab === 'ANALYTICS'} onClick={() => setActiveTab('ANALYTICS')} icon={BarChart2} label="Performance Matrix" />
+            <TabButton active={activeTab === 'SECURITY'} onClick={() => setActiveTab('SECURITY')} icon={ShieldCheck} label="Security Protocol" />
+        </div>
+
+        {/* Dynamic Context Render */}
+        <div className="animate-fade-in-up">
+            {activeTab === 'DOSSIER' && (
+                <div ref={dossierRef} className="space-y-10">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                        {/* 01. Personal & 02. Contact */}
+                        <div className="lg:col-span-2 space-y-8">
+                            <div className="bg-white dark:bg-gray-900 p-10 rounded-[3.5rem] shadow-xl border border-gray-100 dark:border-gray-800">
+                                <SectionHeader icon={User} num="01" title="Identity Nodes" subtitle="Verified Contact Credentials" />
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                    <InfoBit icon={Mail} label="Registry Email" value={student.email} />
+                                    <InfoBit icon={Smartphone} label="Direct Line" value={student.phone} />
+                                    <InfoBit icon={MessageSquare} label="WhatsApp Node" value={student.whatsappNumber} />
+                                    <InfoBit icon={ShieldCheck} label="Aadhar UID" value={student.aadharNumber} />
+                                    <InfoBit icon={Calendar} label="Date of Logic" value={formatDate(student.dob)} />
+                                    <InfoBit icon={Award} label="Identity Type" value={student.gender} />
+                                </div>
+                            </div>
+
+                            {/* 09. Spatial Logic */}
+                            <div className="bg-white dark:bg-gray-900 p-10 rounded-[3.5rem] shadow-xl border border-gray-100 dark:border-gray-800">
+                                <SectionHeader icon={MapPin} num="09" title="Spatial Coordinates" subtitle="Geographical Logic Hub" />
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <div className="p-6 bg-primary-50/50 dark:bg-primary-900/10 rounded-[2.5rem] border border-primary-100 dark:border-primary-800">
+                                        <p className="text-[0.6rem] font-black uppercase text-primary-600 mb-3 tracking-widest">Present Node</p>
+                                        <p className="text-sm font-bold leading-relaxed">{student.presentAddress?.address}, {student.presentAddress?.city}, {student.presentAddress?.district}, {student.presentAddress?.state} - {student.presentAddress?.pincode}</p>
+                                        <p className="text-[0.55rem] text-gray-400 mt-2 font-black uppercase">Via: {student.presentAddress?.via} | Block: {student.presentAddress?.block}</p>
+                                    </div>
+                                    <div className="p-6 bg-gray-50 dark:bg-gray-800 rounded-[2.5rem] border border-gray-100 dark:border-gray-700">
+                                        <p className="text-[0.6rem] font-black uppercase text-gray-400 mb-3 tracking-widest">Permanent Node</p>
+                                        <p className="text-sm font-bold opacity-60 italic">{student.isAddressSame ? "Synchronized with Present Node" : `${student.permanentAddress?.address}, ${student.permanentAddress?.city}`}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Financial Ledger Widget */}
+                        <div className="bg-gradient-to-br from-gray-900 to-primary-900 p-10 rounded-[4rem] text-white shadow-2xl relative overflow-hidden">
+                            <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 blur-[80px] -mr-32 -mt-32" />
+                            <div className="relative z-10 space-y-10">
+                                <div className="flex items-center gap-4">
+                                    <DollarSign size={28} className="text-primary-400" />
+                                    <h3 className="text-xl font-black uppercase tracking-tighter">Registry Ledger</h3>
+                                </div>
+                                <div className="space-y-6">
+                                    <div className="p-6 bg-white/5 backdrop-blur-xl rounded-[2rem] border border-white/10">
+                                        <p className="text-[0.55rem] font-black uppercase tracking-widest opacity-40 mb-1">Active Cycle (Y1)</p>
+                                        <p className="text-2xl font-black tracking-tighter">₹{student.yearFees?.y1?.toLocaleString()}</p>
+                                    </div>
+                                    <div className="p-6 bg-white/5 backdrop-blur-xl rounded-[2rem] border border-white/10">
+                                        <p className="text-[0.55rem] font-black uppercase tracking-widest opacity-40 mb-1">Campus Services Node</p>
+                                        <p className="text-2xl font-black tracking-tighter">₹{student.yearFees?.hostelBus?.toLocaleString()}</p>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="p-4 bg-white/5 rounded-2xl">
+                                            <p className="text-[0.5rem] uppercase opacity-40 mb-1">Cycle 2</p>
+                                            <p className="text-sm font-black">₹{student.yearFees?.y2?.toLocaleString()}</p>
                                         </div>
-                                        <div className="text-right">
-                                            <p className="font-semibold text-lg">₹{fee.amount.toLocaleString()}</p>
-                                            {fee.status === 'Paid' ? (
-                                                <span className="px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300">Paid</span>
-                                            ) : (
-                                                <span className="px-2 py-0.5 text-xs rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300">Pending</span>
-                                            )}
+                                        <div className="p-4 bg-white/5 rounded-2xl">
+                                            <p className="text-[0.5rem] uppercase opacity-40 mb-1">Cycle 3</p>
+                                            <p className="text-sm font-black">₹{student.yearFees?.y3?.toLocaleString()}</p>
                                         </div>
                                     </div>
-                                ))}
+                                </div>
+                                <div className="pt-6 border-t border-white/10 flex justify-between items-center">
+                                    <span className="text-[0.6rem] font-black uppercase tracking-widest text-primary-400">{student.paymentPattern} Protocol</span>
+                                    <CheckCircle size={18} className="text-accent-500" />
+                                </div>
                             </div>
-                         ) : (
-                             <p className="text-center text-gray-500 dark:text-gray-400 py-6">No fee records found.</p>
-                         )}
-                    </Card>
-                 )}
-            </div>
-            <div className="lg:col-span-2">
-                {loading.academics ? <LoadingCard title="Academic Performance" icon={<BarChart2 />} lines={5} /> : (
-                <Card title="Academic Performance" icon={<BarChart2 />}>
-                    <div className="flex flex-col sm:flex-row sm:items-baseline mb-2">
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mr-2">Calculated GPA:</p>
-                        <p className="text-2xl font-bold text-primary-600">{academicSummary.gpa}</p>
+                        </div>
+
+                        {/* 07. Family Lattice */}
+                        <div className="lg:col-span-3 bg-white dark:bg-gray-900 p-10 rounded-[3.5rem] shadow-xl border border-gray-100 dark:border-gray-800">
+                             <SectionHeader icon={Users} num="07" title="Family Lattice" subtitle="Genealogical Logic Sync" />
+                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                                <div className="p-8 bg-primary-50/30 dark:bg-primary-900/10 rounded-[2.5rem] border border-primary-100 dark:border-primary-800">
+                                    <h4 className="text-[0.65rem] font-black text-primary-600 uppercase mb-5 tracking-[0.2em]">Father Node</h4>
+                                    <div className="space-y-4">
+                                        <InfoBit icon={User} label="Legal Name" value={student.family?.father?.name} />
+                                        <InfoBit icon={Smartphone} label="Contact Node" value={student.family?.father?.phone} />
+                                    </div>
+                                </div>
+                                <div className="p-8 bg-secondary-50/30 dark:bg-secondary-900/10 rounded-[2.5rem] border border-secondary-100 dark:border-secondary-800">
+                                    <h4 className="text-[0.65rem] font-black text-secondary-600 uppercase mb-5 tracking-[0.2em]">Mother Node</h4>
+                                    <div className="space-y-4">
+                                        <InfoBit icon={User} label="Legal Name" value={student.family?.mother?.name} />
+                                        <InfoBit icon={Smartphone} label="Contact Node" value={student.family?.mother?.phone} />
+                                    </div>
+                                </div>
+                                <div className="p-8 bg-gray-50 dark:bg-gray-800 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 flex flex-col justify-center">
+                                    <h4 className="text-[0.6rem] font-black text-gray-400 uppercase mb-4 tracking-[0.2em] text-center">Guardian SOS</h4>
+                                    <p className="text-2xl font-black text-gray-900 dark:text-white text-center tracking-tighter">{student.family?.guardianPhone || 'NOT LOGGED'}</p>
+                                    <div className="mt-6 p-4 bg-white dark:bg-gray-900 rounded-2xl flex items-center justify-between shadow-sm">
+                                        <span className="text-[0.5rem] font-black uppercase text-gray-400">Sync Provider</span>
+                                        <span className="text-[0.6rem] font-black text-primary-500 uppercase">{student.staffName || 'System'}</span>
+                                    </div>
+                                </div>
+                             </div>
+                        </div>
                     </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">Subject-wise marks obtained across different exams. Maximum marks for all subjects is 100.</p>
-                    
-                    {academics && academics.length > 0 ? (
-                        <>
-                            <div style={{ width: '100%', height: 250 }}>
-                                <ResponsiveContainer>
-                                    <BarChart data={academicSummary.performance} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-                                        <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200 dark:stroke-gray-700" />
-                                        <XAxis dataKey="subject" fontSize={12} />
-                                        <YAxis domain={[0, 100]} />
-                                        <Tooltip cursor={{fill: 'rgba(100,100,100,0.1)'}} contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.8)', backdropFilter: 'blur(5px)' }}/>
-                                        <Legend />
-                                        {academicSummary.exams.map(exam => (
-                                            <Bar key={exam.name} dataKey={exam.name} fill={exam.color} radius={[4, 4, 0, 0]} />
-                                        ))}
-                                    </BarChart>
+                </div>
+            )}
+
+            {activeTab === 'ANALYTICS' && (
+                <div className="space-y-10 animate-fade-in">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <div className="lg:col-span-2 bg-white dark:bg-gray-900 p-10 rounded-[4rem] shadow-xl border border-gray-100 dark:border-gray-800">
+                             <div className="flex items-center justify-between mb-10">
+                                <h3 className="text-xl font-black uppercase tracking-tighter">Participation Matrix</h3>
+                                <div className="flex items-center gap-3 px-6 py-2 bg-accent-500/5 border border-accent-500/10 rounded-full">
+                                    <div className="w-2 h-2 rounded-full bg-accent-500 animate-pulse" />
+                                    <span className="text-[0.6rem] font-black uppercase tracking-widest text-accent-600">Dynamic Registry</span>
+                                </div>
+                             </div>
+                             <div className="h-[300px]">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={[{day: 'M', p: 85}, {day: 'T', p: 92}, {day: 'W', p: 88}, {day: 'T', p: 95}, {day: 'F', p: 80}]}>
+                                        <defs>
+                                            <linearGradient id="colorP" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.3}/>
+                                                <stop offset="95%" stopColor="#06b6d4" stopOpacity={0}/>
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.1} />
+                                        <XAxis dataKey="day" axisLine={false} tickLine={false} fontSize={10} />
+                                        <YAxis hide />
+                                        <Tooltip contentStyle={{borderRadius: '1rem', border: 'none', background: 'rgba(0,0,0,0.8)', color: '#fff'}} />
+                                        <Area type="monotone" dataKey="p" stroke="#06b6d4" strokeWidth={4} fillOpacity={1} fill="url(#colorP)" />
+                                    </AreaChart>
                                 </ResponsiveContainer>
+                             </div>
+                        </div>
+                        <div className="bg-white dark:bg-gray-900 p-10 rounded-[4rem] shadow-xl border border-gray-100 dark:border-gray-800 text-center flex flex-col justify-center gap-4">
+                            <p className="text-[0.7rem] font-black text-gray-400 uppercase tracking-[0.5em]">Cumulative GPA Node</p>
+                            <h2 className="text-6xl font-black text-primary-600 tracking-tighter">3.82</h2>
+                            <div className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary-50 dark:bg-primary-900/30 rounded-full mx-auto">
+                                <Trophy size={16} className="text-yellow-500" />
+                                <span className="text-[0.6rem] font-black uppercase text-primary-700 dark:text-primary-300">Top 5% Logic Stream</span>
                             </div>
-                            <div className="mt-6 border-t dark:border-gray-700 pt-4">
-                                <h4 className="font-semibold text-gray-700 dark:text-gray-200 mb-2">Detailed Reports</h4>
-                                <ul className="space-y-2">
-                                    {academics.map(marksheet => (
-                                        <li key={marksheet._id} className="flex justify-between items-center p-2 bg-gray-50 dark:bg-gray-700/50 rounded-md">
-                                            <div className="flex items-center">
-                                                <Award size={18} className="mr-3 text-yellow-500"/>
-                                                <span className="font-medium capitalize">{marksheet.exam.replace('-', ' ')}</span>
-                                            </div>
-                                            <button onClick={() => setViewingMarksheet(marksheet)} className="flex items-center text-sm px-3 py-1 bg-primary-100 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300 rounded-md hover:bg-primary-200 dark:hover:bg-primary-900/70">
-                                                <Eye size={14} className="mr-1.5"/> View
-                                            </button>
-                                        </li>
-                                    ))}
-                                </ul>
+                        </div>
+                    </div>
+                    
+                    {/* Qualification Dossier Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                         <div className="bg-white dark:bg-gray-900 p-10 rounded-[3.5rem] shadow-xl border border-gray-100 dark:border-gray-800">
+                            <SectionHeader icon={BookOpen} num="06" title="Legacy Trace" subtitle="10th Qualification Audit" />
+                            <div className="grid grid-cols-2 gap-4">
+                                <InfoBit icon={Database} label="Board" value={student.education10th?.board} />
+                                <InfoBit icon={Trophy} label="Score" value={`${student.education10th?.percentage}%`} color="text-accent-500" />
+                                <div className="col-span-2 p-6 bg-gray-50 dark:bg-gray-800 rounded-3xl">
+                                    <p className="text-[0.5rem] font-black uppercase text-gray-400 mb-1">Institutional Node</p>
+                                    <p className="text-sm font-bold">{student.education10th?.schoolName}</p>
+                                </div>
                             </div>
-                        </>
-                    ) : (
-                        <p className="text-center text-gray-500 dark:text-gray-400 py-10">No academic records found yet.</p>
-                    )}
-                </Card>
-                )}
-            </div>
+                         </div>
+                         <div className="bg-white dark:bg-gray-900 p-10 rounded-[3.5rem] shadow-xl border border-gray-100 dark:border-gray-800">
+                            <SectionHeader icon={Award} num="06" title="Qualification Alpha" subtitle="Last Exam Audit" />
+                            <div className="grid grid-cols-2 gap-4">
+                                <InfoBit icon={Database} label="Exam" value={student.lastExam?.examType} />
+                                <InfoBit icon={Trophy} label="Score" value={`${student.lastExam?.percentage}%`} color="text-secondary-500" />
+                                <div className="col-span-2 p-6 bg-gray-50 dark:bg-gray-800 rounded-3xl">
+                                    <p className="text-[0.5rem] font-black uppercase text-gray-400 mb-1">Institutional Node</p>
+                                    <p className="text-sm font-bold">{student.lastExam?.instituteName}</p>
+                                </div>
+                            </div>
+                         </div>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'SECURITY' && (
+                <div className="max-w-xl mx-auto space-y-10 animate-fade-in">
+                    <div className="text-center space-y-4">
+                        <div className="w-20 h-20 bg-primary-100 dark:bg-primary-900/30 rounded-[2rem] flex items-center justify-center mx-auto text-primary-600 shadow-inner">
+                            <ShieldCheck size={40} />
+                        </div>
+                        <h2 className="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tighter">Access Rotation</h2>
+                        <p className="text-[0.65rem] text-gray-500 font-bold uppercase tracking-[0.3em]">Update Private Access Protocols</p>
+                    </div>
+                    
+                    <form onSubmit={handleUpdatePassword} className="bg-white dark:bg-gray-900 p-10 rounded-[3.5rem] shadow-2xl border border-gray-100 dark:border-gray-800 space-y-8">
+                        <div>
+                            <label className="text-[0.6rem] font-black uppercase tracking-widest text-gray-400 ml-2 mb-2 block">Current Logic Sequence</label>
+                            <input type="password" value={passwords.old} onChange={e => setPasswords({...passwords, old: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-800 border-0 rounded-[1.2rem] focus:ring-4 focus:ring-primary-500/10 font-bold shadow-inner" placeholder="••••••••" required />
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                            <div>
+                                <label className="text-[0.6rem] font-black uppercase tracking-widest text-gray-400 ml-2 mb-2 block">New Logic Node</label>
+                                <input type="password" value={passwords.new} onChange={e => setPasswords({...passwords, new: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-800 border-0 rounded-[1.2rem] focus:ring-4 focus:ring-primary-500/10 font-bold shadow-inner" placeholder="••••••••" required />
+                            </div>
+                            <div>
+                                <label className="text-[0.6rem] font-black uppercase tracking-widest text-gray-400 ml-2 mb-2 block">Confirm Node</label>
+                                <input type="password" value={passwords.confirm} onChange={e => setPasswords({...passwords, confirm: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-800 border-0 rounded-[1.2rem] focus:ring-4 focus:ring-primary-500/10 font-bold shadow-inner" placeholder="••••••••" required />
+                            </div>
+                        </div>
+                        <button type="submit" disabled={updatingSecurity} className="w-full py-4 bg-primary-600 text-white font-black uppercase text-[0.65rem] tracking-[0.3em] rounded-[1.2rem] shadow-xl shadow-primary-500/30 hover:bg-primary-700 active:scale-95 transition-all flex items-center justify-center gap-4">
+                            {updatingSecurity ? <Loader2 className="animate-spin" /> : <RefreshCw size={18} />}
+                            {updatingSecurity ? 'Rotating Keys...' : 'Initialize Access Rotation'}
+                        </button>
+                    </form>
+                </div>
+            )}
         </div>
-        {viewingMarksheet && student && <MarksheetModal marksheet={viewingMarksheet} student={student} onClose={() => setViewingMarksheet(null)} />}
-        {isAttendanceModalOpen && attendance && <AttendanceModal attendance={attendance} onClose={() => setIsAttendanceModalOpen(false)} />}
     </div>
   );
 }
-
-const Card = ({ title, icon, children }) => (
-    <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg h-full">
-        <div className="flex items-center text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">
-            {React.cloneElement(icon, { className: "mr-3 text-primary-500"})}
-            {title}
-        </div>
-        <div className="space-y-4">
-            {children}
-        </div>
-    </div>
-);

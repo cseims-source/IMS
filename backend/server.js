@@ -23,6 +23,7 @@ import transportRoutes from './routes/transportRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
 import careerRoutes from './routes/careerRoutes.js';
 import admissionRoutes from './routes/admissionRoutes.js';
+import questionPaperRoutes from './routes/questionPaperRoutes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -41,8 +42,6 @@ connectDB();
 
 const app = express();
 
-// Basic CORS setup - allowing all for easy deployment, 
-// you can restrict this to your Vercel URL later for security.
 app.use(cors({
     origin: '*', 
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -56,7 +55,6 @@ app.get('/', (req, res) => {
     res.send('AIET Institute API is running...');
 });
 
-// API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/students', studentRoutes);
@@ -76,6 +74,7 @@ app.use('/api/transport', transportRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/career', careerRoutes);
 app.use('/api/admission', admissionRoutes);
+app.use('/api/question-papers', questionPaperRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
