@@ -134,6 +134,11 @@ export default function StudentManager() {
       }
   }
 
+  const handleImportSuccess = () => {
+      setIsImportModalOpen(false);
+      fetchAll();
+  };
+
   return (
     <div className="space-y-8 animate-fade-in max-w-[1700px] mx-auto pb-20">
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6 px-2">
@@ -290,7 +295,7 @@ export default function StudentManager() {
         </div>
 
         {isFormOpen && <StudentForm student={editingStudent} onSave={handleSave} onCancel={() => setIsFormOpen(false)} />}
-        {isImportModalOpen && <StudentImportModal onClose={() => setIsImportModalOpen(false)} onImportSuccess={fetchAll} />}
+        {isImportModalOpen && <StudentImportModal onClose={() => setIsImportModalOpen(false)} onImportSuccess={handleImportSuccess} />}
         {viewingStudent && <StudentDetailModal student={viewingStudent} onClose={() => setViewingStudent(null)} />}
         
         {deletingStudent && (

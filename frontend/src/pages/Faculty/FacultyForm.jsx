@@ -6,7 +6,8 @@ const labelClasses = "block text-[0.6rem] font-black uppercase tracking-[0.2em] 
 const inputClasses = "w-full p-4 bg-gray-50 dark:bg-gray-800 border-0 rounded-2xl focus:ring-4 focus:ring-primary-500/10 font-bold text-gray-900 dark:text-white shadow-inner transition-all";
 
 export default function FacultyForm({ faculty, onSave, onCancel }) {
-    const [formData, setFormData] = useState(faculty || { 
+    // 1. Core State Initialization
+    const [formData, setFormData] = useState({ 
         name: '', email: '', phone: '', subject: '', qualification: '', designation: 'Assistant Professor',
         department: 'CSE', experienceYears: 0, photo: null, assignedStreams: [], assignedSubjects: [],
         status: 'Active', joiningDate: new Date().toISOString().split('T')[0],
@@ -15,11 +16,27 @@ export default function FacultyForm({ faculty, onSave, onCancel }) {
     
     const [allStreams, setAllStreams] = useState([]);
     const { api } = useAuth();
+    
+    // CRITICAL FIX: Ensure the ref is defined and accessible to the component
     const fileInputRef = useRef(null);
 
+    // 2. Data Synchronization (Sync with incoming 'faculty' prop for editing)
     useEffect(() => {
-        api('/api/streams').then(setAllStreams).catch(console.error);
-    }, [api]);
+        if (faculty) {
+            setFormData({
+                ...faculty,
+                // Ensure nested structures are initialized to prevent undefined errors
+                address: faculty.address || { current: '', permanent: '' },
+                assignedStreams: faculty.assignedStreams || [],
+                assignedSubjects: faculty.assignedSubjects || []
+            });
+        }
+        
+        // Fetch stream nodes for selection lattice
+        api('/api/streams')
+            .then(data => setAllStreams(data || []))
+            .catch(err => console.error("Registry fetch error:", err));
+    }, [faculty, api]);
 
     const handleFileChange = (e) => {
         const file = e.target.files[0];
@@ -49,6 +66,7 @@ export default function FacultyForm({ faculty, onSave, onCancel }) {
         <div className="fixed inset-0 bg-gray-950/95 backdrop-blur-xl flex justify-center items-center z-[300] p-4">
             <div className="bg-white dark:bg-gray-900 rounded-[3.5rem] shadow-3xl w-full max-w-5xl h-[92vh] flex flex-col border border-white/10 animate-scale-in">
                 
+                {/* Header Sequence */}
                 <div className="p-10 border-b dark:border-gray-800 flex items-center justify-between bg-white dark:bg-gray-900 z-20">
                     <div className="flex items-center gap-6">
                         <div className="p-4 bg-primary-600 rounded-3xl text-white shadow-2xl shadow-primary-500/40">
@@ -70,8 +88,12 @@ export default function FacultyForm({ faculty, onSave, onCancel }) {
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 bg-gray-50/50 dark:bg-gray-950/30 p-10 rounded-[3rem] border border-gray-100 dark:border-gray-800 shadow-inner">
                         <div className="lg:col-span-3 flex flex-col items-center gap-6">
                             <div className="w-48 h-48 rounded-[3rem] bg-white dark:bg-gray-950 border-4 border-dashed border-gray-200 dark:border-gray-800 flex items-center justify-center overflow-hidden group relative shadow-2xl">
-                                {formData.photo ? <img src={formData.photo} className="w-full h-full object-cover" /> : <User size={64} className="text-gray-200" />}
-                                <button type="button" onClick={() => fileInputRef.current.click()} className="absolute inset-0 bg-primary-600/90 opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-center text-white">
+                                {formData.photo ? <img src={formData.photo} className="w-full h-full object-cover" alt="Node Preview" /> : <User size={64} className="text-gray-200" />}
+                                <button 
+                                    type="button" 
+                                    onClick={() => fileInputRef.current?.click()} 
+                                    className="absolute inset-0 bg-primary-600/90 opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-center text-white"
+                                >
                                     <Upload size={28} />
                                     <span className="text-[0.5rem] font-black uppercase tracking-widest mt-2">Sync Identity</span>
                                 </button>
@@ -157,7 +179,12 @@ export default function FacultyForm({ faculty, onSave, onCancel }) {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                         <div>
                             <label className={labelClasses}>Present Coordinate (Address)</label>
-                            <textarea value={formData.address.current} onChange={e => setFormData({...formData, address: {...formData.address, current: e.target.value}})} className={`${inputClasses} h-32 resize-none`} placeholder="Bhubaneswar HQ..." />
+                            <textarea 
+                                value={formData.address?.current || ''} 
+                                onChange={e => setFormData({...formData, address: {...formData.address, current: e.target.value}})} 
+                                className={`${inputClasses} h-32 resize-none`} 
+                                placeholder="Address lookup..." 
+                            />
                         </div>
                         <div>
                             <label className={labelClasses}>Registry Status</label>

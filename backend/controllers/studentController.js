@@ -128,14 +128,29 @@ const getStudentsByStream = async (req, res) => {
     try {
         const { streamName } = req.params;
         const { semester } = req.query;
+        
+        // fuzzy matching for stream to handle B.Tech / MBA prefixes
+        const query = { 
+            stream: { $regex: streamName, $options: 'i' }
+        };
+        
+        if (semester) {
+            query.currentSemester = parseInt(semester);
+        }
+
+        // Permission Check: Admin can see anyone, Teachers only assigned
         if (req.user.role === 'Teacher') {
             const teacher = await Faculty.findById(req.user.profileId);
-            if (!teacher.assignedStreams.includes(streamName)) return res.status(403).json({ message: "Access Denied" });
+            if (!teacher.assignedStreams.some(s => s.toLowerCase().includes(streamName.toLowerCase()))) {
+                return res.status(403).json({ message: "Access Denied: Node not assigned to your Faculty profile." });
+            }
         }
-        const query = { stream: streamName };
-        if (semester) query.currentSemester = parseInt(semester);
-        res.json(await Student.find(query));
-    } catch (error) { res.status(500).json({ message: 'Server Error' }); }
+
+        const students = await Student.find(query).sort({ firstName: 1 });
+        res.json(students);
+    } catch (error) { 
+        res.status(500).json({ message: 'Server Error during student lookup' }); 
+    }
 };
 
 const getStudentProfile = async (req, res) => {

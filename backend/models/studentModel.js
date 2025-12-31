@@ -13,7 +13,7 @@ const studentSchema = mongoose.Schema({
     photo: { type: String },
 
     // 2. Contact Information
-    phone: { type: String, required: true },
+    phone: { type: String }, // Made optional for initial registration
     whatsappNumber: { type: String },
     isWhatsappSameAsPhone: { type: Boolean, default: false },
     email: { type: String, required: true, unique: true },
@@ -29,13 +29,13 @@ const studentSchema = mongoose.Schema({
     currentSemester: { type: Number, default: 1 },
     stream: { type: String, default: 'Unassigned' },
 
-    // 4. Entrance & Identification (NEWLY SEGMENTED)
+    // 4. Entrance & Identification
     appearedInEntrance: { type: String, default: 'No' },
     entranceRollNo: { type: String },
     aadharNumber: { type: String },
     facebookId: { type: String },
 
-    // 5. Institutional Services (NEWLY SEGMENTED)
+    // 5. Institutional Services
     accommodationRequired: { type: String, default: 'No' },
     staffName: { type: String },
 

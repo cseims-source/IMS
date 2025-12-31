@@ -109,8 +109,8 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
 
   return (
     <>
-      <div className={`fixed inset-0 z-20 bg-black/40 backdrop-blur-sm lg:hidden transition-opacity duration-300 ${sidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} onClick={() => setSidebarOpen(false)}></div>
-      <div className={`fixed inset-y-0 left-0 z-30 w-72 bg-white dark:bg-gray-950 border-r border-gray-100 dark:border-gray-900 transform lg:translate-x-0 lg:static lg:inset-0 transition-transform duration-500 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <div className={`fixed inset-0 z-20 bg-black/40 backdrop-blur-sm lg:hidden transition-opacity duration-300 print:hidden ${sidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} onClick={() => setSidebarOpen(false)}></div>
+      <div className={`fixed inset-y-0 left-0 z-30 w-72 bg-white dark:bg-gray-950 border-r border-gray-100 dark:border-gray-900 transform lg:translate-x-0 lg:static lg:inset-0 transition-transform duration-500 ease-in-out print:hidden ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="flex flex-col h-full px-6 py-8">
             <div className="flex items-center justify-center mb-10 group cursor-pointer">
                 <img src="/logo.png" alt="AIET" className="h-12 w-auto group-hover:scale-105 transition-transform duration-500" />

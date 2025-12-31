@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -56,7 +55,7 @@ export default function Header({ setSidebarOpen }) {
   }
 
   return (
-    <header className="sticky top-0 z-40 flex items-center justify-between px-8 py-4 bg-white/80 dark:bg-gray-950/80 backdrop-blur-2xl border-b border-gray-100 dark:border-gray-900 transition-all duration-500">
+    <header className="sticky top-0 z-40 flex items-center justify-between px-8 py-4 bg-white/80 dark:bg-gray-950/80 backdrop-blur-2xl border-b border-gray-100 dark:border-gray-900 transition-all duration-500 print:hidden">
       <div className="flex items-center flex-1 relative" ref={searchRef}>
         <button onClick={() => setSidebarOpen(true)} className="text-gray-500 focus:outline-none lg:hidden mr-6 p-2 rounded-xl hover:bg-gray-100 transition-colors">
           <Menu size={24} />

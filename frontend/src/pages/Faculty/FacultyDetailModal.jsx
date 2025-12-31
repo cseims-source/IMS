@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { X, Printer, Fingerprint, Database, Cpu, Mail, Smartphone, Layers, GraduationCap, ShieldCheck, UserCheck, Briefcase, MapPin, Calendar, Clock } from 'lucide-react';
+import { X, Printer, Fingerprint, Database, Cpu, Mail, Smartphone, Layers, GraduationCap, ShieldCheck, UserCheck, Briefcase, MapPin, Calendar, Clock, UserCog } from 'lucide-react';
 import { formatDate } from '../../utils/dateFormatter';
 
 const InfoBit = ({ label, value, icon: Icon, color = "text-primary-500" }) => (
@@ -27,8 +27,8 @@ export default function FacultyDetailModal({ faculty, onClose }) {
     const photoUrl = faculty.photo || `https://api.dicebear.com/8.x/initials/svg?seed=${faculty.name}`;
 
     return (
-        <div className="fixed inset-0 bg-gray-950/95 backdrop-blur-3xl flex justify-center items-center z-[250] p-4 print:p-0 print:bg-white print:static">
-            <div className="bg-white dark:bg-gray-950 rounded-[4rem] shadow-[0_0_80px_rgba(0,0,0,0.5)] w-full max-w-6xl h-[95vh] flex flex-col border border-white/10 overflow-hidden animate-scale-in print:h-auto print:border-none print:shadow-none print:rounded-none">
+        <div className="fixed inset-0 bg-gray-950/95 backdrop-blur-3xl flex justify-center items-center z-[250] p-4 print:p-0 print:bg-white print:static print:inset-auto">
+            <div className="bg-white dark:bg-gray-950 rounded-[4rem] shadow-[0_0_80px_rgba(0,0,0,0.5)] w-full max-w-6xl h-[95vh] flex flex-col border border-white/10 overflow-hidden animate-scale-in print:h-auto print:border-none print:shadow-none print:rounded-none print:w-full">
                 
                 <div className="p-10 border-b dark:border-gray-800 flex items-center justify-between bg-white dark:bg-gray-950 z-20 print:hidden shadow-sm">
                     <div className="flex items-center gap-6">
@@ -47,24 +47,24 @@ export default function FacultyDetailModal({ faculty, onClose }) {
                     </div>
                 </div>
 
-                <div className="flex-grow overflow-y-auto p-12 scrollbar-hide space-y-16 print:p-0">
+                <div className="flex-grow overflow-y-auto p-12 scrollbar-hide space-y-16 print:p-0 print:overflow-visible">
                     
                     <section className="flex flex-col md:flex-row gap-12 items-center md:items-start text-center md:text-left relative">
                         <div className="absolute top-0 right-0 p-8 opacity-5 dark:opacity-10 print:hidden">
                             <Cpu size={200} className="text-primary-600" />
                         </div>
                         <div className="relative">
-                            <div className="w-48 h-48 rounded-[4rem] bg-gray-50 dark:bg-gray-800 border-8 border-white dark:border-gray-700 shadow-3xl overflow-hidden relative group">
+                            <div className="w-48 h-48 rounded-[4rem] bg-gray-50 dark:bg-gray-800 border-8 border-white dark:border-gray-700 shadow-3xl overflow-hidden relative group print:w-32 print:h-32">
                                 <img src={photoUrl} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" />
                             </div>
-                            <div className="absolute -bottom-2 -right-2 bg-primary-600 text-white p-3 rounded-2xl shadow-2xl border-4 border-white dark:border-gray-950 animate-float">
+                            <div className="absolute -bottom-2 -right-2 bg-primary-600 text-white p-3 rounded-2xl shadow-2xl border-4 border-white dark:border-gray-950 animate-float print:hidden">
                                 <UserCheck size={20} />
                             </div>
                         </div>
                         <div className="flex-grow space-y-6 relative z-10">
                             <div className="space-y-2">
                                 <div className="flex items-center justify-center md:justify-start gap-4 mb-2">
-                                    <span className="px-5 py-1.5 bg-accent-100 text-accent-700 rounded-full text-[0.55rem] font-black uppercase tracking-[0.2em] shadow-sm">Verified Faculty Cluster</span>
+                                    <span className="px-5 py-1.5 bg-accent-100 text-accent-700 rounded-full text-[0.55rem] font-black uppercase tracking-[0.2em] shadow-sm print:border print:border-accent-200">Verified Faculty Cluster</span>
                                     <span className={`px-5 py-1.5 rounded-full text-[0.55rem] font-black uppercase tracking-[0.2em] ${faculty.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>Node: {faculty.status}</span>
                                 </div>
                                 <h1 className="text-4xl md:text-5xl font-black text-gray-900 dark:text-white uppercase tracking-tighter leading-[0.9]">{faculty.name}</h1>
@@ -94,27 +94,27 @@ export default function FacultyDetailModal({ faculty, onClose }) {
                             <InfoBit icon={MapPin} label="Spatial Coordinate" value={faculty.address?.current} color="text-red-500" />
                         </div>
 
-                        <div className="bg-gray-50 dark:bg-gray-900/50 p-8 rounded-[3.5rem] border border-gray-100 dark:border-gray-800 flex flex-col gap-8 shadow-inner">
+                        <div className="bg-gray-50 dark:bg-gray-900/50 p-8 rounded-[3.5rem] border border-gray-100 dark:border-gray-800 flex flex-col gap-8 shadow-inner print:border-none print:shadow-none">
                             <div className="space-y-6">
-                                <div className="flex items-center gap-4 text-primary-500 border-b dark:border-gray-800 pb-3">
+                                <div className="flex items-center gap-4 text-primary-500 border-b dark:border-gray-800 pb-3 print:border-gray-200">
                                     <Layers size={18} />
                                     <h4 className="text-[0.6rem] font-black uppercase tracking-widest">Stream Matrix</h4>
                                 </div>
                                 <div className="flex flex-wrap gap-2">
                                     {faculty.assignedStreams?.length > 0 ? faculty.assignedStreams.map(s => (
-                                        <span key={s} className="px-4 py-2 bg-white dark:bg-gray-800 text-[0.5rem] font-black uppercase tracking-widest rounded-xl border dark:border-gray-700 shadow-sm transition-all hover:scale-110">{s}</span>
+                                        <span key={s} className="px-4 py-2 bg-white dark:bg-gray-800 text-[0.5rem] font-black uppercase tracking-widest rounded-xl border dark:border-gray-700 shadow-sm transition-all hover:scale-110 print:border-gray-100">{s}</span>
                                     )) : <span className="text-[0.5rem] italic text-gray-400 uppercase tracking-widest">Logic: Unlinked</span>}
                                 </div>
                             </div>
                             
                             <div className="space-y-6">
-                                <div className="flex items-center gap-4 text-accent-500 border-b dark:border-gray-800 pb-3">
+                                <div className="flex items-center gap-4 text-accent-500 border-b dark:border-gray-800 pb-3 print:border-gray-200">
                                     <ShieldCheck size={18} />
                                     <h4 className="text-[0.6rem] font-black uppercase tracking-widest">Subject Expertise</h4>
                                 </div>
                                 <div className="flex flex-wrap gap-2">
                                     {faculty.assignedSubjects?.length > 0 ? faculty.assignedSubjects.map(s => (
-                                        <span key={s} className="px-4 py-2 bg-white dark:bg-gray-800 text-[0.5rem] font-black uppercase tracking-widest rounded-xl border dark:border-gray-700 shadow-sm transition-all hover:scale-110">{s}</span>
+                                        <span key={s} className="px-4 py-2 bg-white dark:bg-gray-800 text-[0.5rem] font-black uppercase tracking-widest rounded-xl border dark:border-gray-700 shadow-sm transition-all hover:scale-110 print:border-gray-100">{s}</span>
                                     )) : <span className="text-[0.5rem] italic text-gray-400 uppercase tracking-widest">Nodes: Unassigned</span>}
                                 </div>
                             </div>
@@ -122,12 +122,12 @@ export default function FacultyDetailModal({ faculty, onClose }) {
                     </div>
                 </div>
 
-                <div className="p-10 border-t dark:border-gray-800 bg-white/80 dark:bg-gray-950/80 backdrop-blur-2xl flex justify-between items-center z-20 print:hidden shadow-3xl">
+                <div className="p-10 border-t dark:border-gray-800 bg-white/80 dark:bg-gray-950/80 backdrop-blur-2xl flex justify-between items-center z-20 print:flex print:static print:border-t print:mt-10 shadow-3xl print:shadow-none">
                      <div className="flex items-center gap-4">
                         <UserCog size={20} className="text-gray-400" />
                         <p className="text-[0.55rem] font-black uppercase tracking-[0.8em] text-gray-400">AIET INSTITUTIONAL LATTICE ALPHA • CLOUD VERSION</p>
                      </div>
-                    <button onClick={onClose} className="px-14 py-4 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-[0.65rem] font-black uppercase tracking-[0.3em] rounded-3xl active:scale-95 transition-transform shadow-2xl">Terminal Exit</button>
+                    <button onClick={onClose} className="px-14 py-4 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-[0.65rem] font-black uppercase tracking-[0.3em] rounded-3xl active:scale-95 transition-transform shadow-2xl print:hidden">Terminal Exit</button>
                 </div>
             </div>
         </div>

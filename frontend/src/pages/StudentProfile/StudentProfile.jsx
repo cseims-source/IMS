@@ -1,15 +1,13 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { 
-    User, Mail, Phone, Home, GraduationCap, BarChart2, 
-    CheckCircle, Calendar, X, Download, Eye, Award, 
-    Image as ImageIcon, DollarSign, Bookmark, Shield, 
-    Users, MapPin, Trophy, Fingerprint, KeyRound, 
-    CheckCircle2, AlertCircle, Loader2, Smartphone,
-    Bus, ClipboardCheck, MessageSquare, Save, RefreshCw, FileDown,
-    Clock, ShieldCheck, UserCog, Database, BookOpen, ShieldAlert, Landmark, Activity
+    User, Mail, Smartphone, GraduationCap, BarChart2, 
+    CheckCircle, Calendar, Download, Award, 
+    DollarSign, Users, MapPin, Fingerprint, 
+    ShieldCheck, RefreshCw, FileDown,
+    Clock, Database, BookOpen, Lock, Save, ShieldAlert, Activity
 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, AreaChart, Area } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { formatDate } from '../../utils/dateFormatter';
@@ -57,9 +55,10 @@ const SectionHeader = ({ icon: Icon, num, title, subtitle }) => (
 
 export default function StudentProfile() {
   const [student, setStudent] = useState(null);
+  const [attendanceSummary, setAttendanceSummary] = useState([]);
   const [activeTab, setActiveTab] = useState('DOSSIER');
   const [loading, setLoading] = useState(true);
-  const { api } = useAuth();
+  const { api, user } = useAuth();
   const { addToast } = useNotification();
   const dossierRef = useRef(null);
 
@@ -73,8 +72,12 @@ export default function StudentProfile() {
   const fetchProfile = async () => {
     setLoading(true);
     try {
-      const data = await api('/api/students/profile');
-      setStudent(data);
+      const [profileData, attendanceData] = await Promise.all([
+          api('/api/students/profile'),
+          api(`/api/attendance/summary/${user.profileId}`)
+      ]);
+      setStudent(profileData);
+      setAttendanceSummary(attendanceData);
     } catch (error) {
       addToast("Failed to sync neural profile.", "error");
     } finally {
@@ -97,6 +100,13 @@ export default function StudentProfile() {
         addToast(err.message, 'error');
     } finally { setUpdatingSecurity(false); }
   };
+
+  const overallAttendance = useMemo(() => {
+      if (!attendanceSummary.length) return 0;
+      const total = attendanceSummary.reduce((acc, s) => acc + s.total, 0);
+      const present = attendanceSummary.reduce((acc, s) => acc + s.present, 0);
+      return ((present / total) * 100).toFixed(1);
+  }, [attendanceSummary]);
 
   const downloadFullDossier = async () => {
       if (!dossierRef.current) return;
@@ -125,7 +135,6 @@ export default function StudentProfile() {
 
   return (
     <div className="space-y-8 animate-fade-in max-w-[1600px] mx-auto pb-24">
-        {/* Profile Header Block */}
         <div className="bg-white dark:bg-gray-900 p-10 rounded-[4rem] shadow-2xl border border-white/20 dark:border-gray-800 relative overflow-hidden group">
             <div className="absolute top-0 right-0 w-96 h-96 bg-primary-600/5 blur-[120px] -mr-32 -mt-32" />
             <div className="flex flex-col md:flex-row items-center gap-12 relative z-10">
@@ -148,11 +157,11 @@ export default function StudentProfile() {
                         {student.firstName} <span className="text-primary-600">{student.lastName}</span>
                     </h1>
                     <div className="flex flex-wrap justify-center md:justify-start gap-4">
-                        <div className="flex items-center gap-3 px-6 py-2 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700">
+                        <div className="flex items-center gap-3 px-6 py-2 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 transition-all hover:border-primary-500/30">
                             <GraduationCap size={14} className="text-primary-500" />
                             <span className="text-[0.65rem] font-black uppercase tracking-widest text-gray-700 dark:text-gray-200">{student.course} • {student.branch}</span>
                         </div>
-                        <div className="flex items-center gap-3 px-6 py-2 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700">
+                        <div className="flex items-center gap-3 px-6 py-2 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 transition-all hover:border-primary-500/30">
                             <Clock size={14} className="text-primary-500" />
                             <span className="text-[0.65rem] font-black uppercase tracking-widest text-gray-700 dark:text-gray-200">Semester {student.currentSemester}</span>
                         </div>
@@ -165,19 +174,16 @@ export default function StudentProfile() {
             </div>
         </div>
 
-        {/* Tab Selection */}
         <div className="flex flex-wrap gap-4 justify-center md:justify-start px-2">
             <TabButton active={activeTab === 'DOSSIER'} onClick={() => setActiveTab('DOSSIER')} icon={Database} label="Registry Dossier" />
-            <TabButton active={activeTab === 'ANALYTICS'} onClick={() => setActiveTab('ANALYTICS')} icon={BarChart2} label="Performance Matrix" />
+            <TabButton active={activeTab === 'ANALYTICS'} onClick={() => setActiveTab('ANALYTICS')} icon={Activity} label="Performance Matrix" />
             <TabButton active={activeTab === 'SECURITY'} onClick={() => setActiveTab('SECURITY')} icon={ShieldCheck} label="Security Protocol" />
         </div>
 
-        {/* Dynamic Context Render */}
         <div className="animate-fade-in-up">
             {activeTab === 'DOSSIER' && (
                 <div ref={dossierRef} className="space-y-10">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                        {/* 01. Personal & 02. Contact */}
                         <div className="lg:col-span-2 space-y-8">
                             <div className="bg-white dark:bg-gray-900 p-10 rounded-[3.5rem] shadow-xl border border-gray-100 dark:border-gray-800">
                                 <SectionHeader icon={User} num="01" title="Identity Nodes" subtitle="Verified Contact Credentials" />
@@ -191,7 +197,6 @@ export default function StudentProfile() {
                                 </div>
                             </div>
 
-                            {/* 09. Spatial Logic */}
                             <div className="bg-white dark:bg-gray-900 p-10 rounded-[3.5rem] shadow-xl border border-gray-100 dark:border-gray-800">
                                 <SectionHeader icon={MapPin} num="09" title="Spatial Coordinates" subtitle="Geographical Logic Hub" />
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -208,7 +213,6 @@ export default function StudentProfile() {
                             </div>
                         </div>
 
-                        {/* Financial Ledger Widget */}
                         <div className="bg-gradient-to-br from-gray-900 to-primary-900 p-10 rounded-[4rem] text-white shadow-2xl relative overflow-hidden">
                             <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 blur-[80px] -mr-32 -mt-32" />
                             <div className="relative z-10 space-y-10">
@@ -225,51 +229,12 @@ export default function StudentProfile() {
                                         <p className="text-[0.55rem] font-black uppercase tracking-widest opacity-40 mb-1">Campus Services Node</p>
                                         <p className="text-2xl font-black tracking-tighter">₹{student.yearFees?.hostelBus?.toLocaleString()}</p>
                                     </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="p-4 bg-white/5 rounded-2xl">
-                                            <p className="text-[0.5rem] uppercase opacity-40 mb-1">Cycle 2</p>
-                                            <p className="text-sm font-black">₹{student.yearFees?.y2?.toLocaleString()}</p>
-                                        </div>
-                                        <div className="p-4 bg-white/5 rounded-2xl">
-                                            <p className="text-[0.5rem] uppercase opacity-40 mb-1">Cycle 3</p>
-                                            <p className="text-sm font-black">₹{student.yearFees?.y3?.toLocaleString()}</p>
-                                        </div>
-                                    </div>
                                 </div>
                                 <div className="pt-6 border-t border-white/10 flex justify-between items-center">
                                     <span className="text-[0.6rem] font-black uppercase tracking-widest text-primary-400">{student.paymentPattern} Protocol</span>
                                     <CheckCircle size={18} className="text-accent-500" />
                                 </div>
                             </div>
-                        </div>
-
-                        {/* 07. Family Lattice */}
-                        <div className="lg:col-span-3 bg-white dark:bg-gray-900 p-10 rounded-[3.5rem] shadow-xl border border-gray-100 dark:border-gray-800">
-                             <SectionHeader icon={Users} num="07" title="Family Lattice" subtitle="Genealogical Logic Sync" />
-                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                                <div className="p-8 bg-primary-50/30 dark:bg-primary-900/10 rounded-[2.5rem] border border-primary-100 dark:border-primary-800">
-                                    <h4 className="text-[0.65rem] font-black text-primary-600 uppercase mb-5 tracking-[0.2em]">Father Node</h4>
-                                    <div className="space-y-4">
-                                        <InfoBit icon={User} label="Legal Name" value={student.family?.father?.name} />
-                                        <InfoBit icon={Smartphone} label="Contact Node" value={student.family?.father?.phone} />
-                                    </div>
-                                </div>
-                                <div className="p-8 bg-secondary-50/30 dark:bg-secondary-900/10 rounded-[2.5rem] border border-secondary-100 dark:border-secondary-800">
-                                    <h4 className="text-[0.65rem] font-black text-secondary-600 uppercase mb-5 tracking-[0.2em]">Mother Node</h4>
-                                    <div className="space-y-4">
-                                        <InfoBit icon={User} label="Legal Name" value={student.family?.mother?.name} />
-                                        <InfoBit icon={Smartphone} label="Contact Node" value={student.family?.mother?.phone} />
-                                    </div>
-                                </div>
-                                <div className="p-8 bg-gray-50 dark:bg-gray-800 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 flex flex-col justify-center">
-                                    <h4 className="text-[0.6rem] font-black text-gray-400 uppercase mb-4 tracking-[0.2em] text-center">Guardian SOS</h4>
-                                    <p className="text-2xl font-black text-gray-900 dark:text-white text-center tracking-tighter">{student.family?.guardianPhone || 'NOT LOGGED'}</p>
-                                    <div className="mt-6 p-4 bg-white dark:bg-gray-900 rounded-2xl flex items-center justify-between shadow-sm">
-                                        <span className="text-[0.5rem] font-black uppercase text-gray-400">Sync Provider</span>
-                                        <span className="text-[0.6rem] font-black text-primary-500 uppercase">{student.staffName || 'System'}</span>
-                                    </div>
-                                </div>
-                             </div>
                         </div>
                     </div>
                 </div>
@@ -280,61 +245,67 @@ export default function StudentProfile() {
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                         <div className="lg:col-span-2 bg-white dark:bg-gray-900 p-10 rounded-[4rem] shadow-xl border border-gray-100 dark:border-gray-800">
                              <div className="flex items-center justify-between mb-10">
-                                <h3 className="text-xl font-black uppercase tracking-tighter">Participation Matrix</h3>
+                                <h3 className="text-xl font-black uppercase tracking-tighter">Participation Matrix (All Modules)</h3>
                                 <div className="flex items-center gap-3 px-6 py-2 bg-accent-500/5 border border-accent-500/10 rounded-full">
                                     <div className="w-2 h-2 rounded-full bg-accent-500 animate-pulse" />
-                                    <span className="text-[0.6rem] font-black uppercase tracking-widest text-accent-600">Dynamic Registry</span>
+                                    <span className="text-[0.6rem] font-black uppercase tracking-widest text-accent-600">Overall: {overallAttendance}%</span>
                                 </div>
                              </div>
-                             <div className="h-[300px]">
+                             <div className="h-[350px]">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <AreaChart data={[{day: 'M', p: 85}, {day: 'T', p: 92}, {day: 'W', p: 88}, {day: 'T', p: 95}, {day: 'F', p: 80}]}>
-                                        <defs>
-                                            <linearGradient id="colorP" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.3}/>
-                                                <stop offset="95%" stopColor="#06b6d4" stopOpacity={0}/>
-                                            </linearGradient>
-                                        </defs>
+                                    <BarChart data={attendanceSummary}>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.1} />
-                                        <XAxis dataKey="day" axisLine={false} tickLine={false} fontSize={10} />
-                                        <YAxis hide />
-                                        <Tooltip contentStyle={{borderRadius: '1rem', border: 'none', background: 'rgba(0,0,0,0.8)', color: '#fff'}} />
-                                        <Area type="monotone" dataKey="p" stroke="#06b6d4" strokeWidth={4} fillOpacity={1} fill="url(#colorP)" />
-                                    </AreaChart>
+                                        <XAxis dataKey="subject" axisLine={false} tickLine={false} fontSize={10} interval={0} />
+                                        <YAxis domain={[0, 100]} hide />
+                                        <Tooltip cursor={{fill: 'rgba(79, 70, 229, 0.05)'}} contentStyle={{ borderRadius: '1rem', border: 'none', background: 'rgba(0,0,0,0.85)', color: '#fff', fontSize: '12px', fontWeight: '900' }} />
+                                        <Bar dataKey="percentage" radius={[12, 12, 0, 0]} barSize={40}>
+                                            {attendanceSummary.map((entry, index) => (
+                                                <Cell key={index} fill={entry.percentage >= 75 ? '#06b6d4' : '#ef4444'} />
+                                            ))}
+                                        </Bar>
+                                    </BarChart>
                                 </ResponsiveContainer>
                              </div>
                         </div>
-                        <div className="bg-white dark:bg-gray-900 p-10 rounded-[4rem] shadow-xl border border-gray-100 dark:border-gray-800 text-center flex flex-col justify-center gap-4">
-                            <p className="text-[0.7rem] font-black text-gray-400 uppercase tracking-[0.5em]">Cumulative GPA Node</p>
-                            <h2 className="text-6xl font-black text-primary-600 tracking-tighter">3.82</h2>
-                            <div className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary-50 dark:bg-primary-900/30 rounded-full mx-auto">
-                                <Trophy size={16} className="text-yellow-500" />
-                                <span className="text-[0.6rem] font-black uppercase text-primary-700 dark:text-primary-300">Top 5% Logic Stream</span>
+                        <div className="bg-white dark:bg-gray-900 p-10 rounded-[4rem] shadow-xl border border-gray-100 dark:border-gray-800 text-center flex flex-col justify-center gap-6 relative overflow-hidden group">
+                            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-primary-600 to-indigo-600"></div>
+                            <p className="text-[0.7rem] font-black text-gray-400 uppercase tracking-[0.5em]">Lattice Performance Node</p>
+                            <div className="relative">
+                                <h2 className={`text-7xl font-black tracking-tighter ${overallAttendance >= 75 ? 'text-primary-600' : 'text-red-500'}`}>{overallAttendance}%</h2>
+                                <p className={`text-[0.6rem] font-black uppercase tracking-[0.3em] mt-2 ${overallAttendance >= 75 ? 'text-accent-600' : 'text-red-500'}`}>
+                                    {overallAttendance >= 75 ? 'Optimal Standing' : 'Flagged Standing'}
+                                </p>
+                            </div>
+                            <div className="p-6 bg-gray-50 dark:bg-gray-800/50 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 text-left space-y-4">
+                                <p className="text-[0.6rem] font-black uppercase text-gray-400 tracking-widest">Logic Breakdown</p>
+                                <div className="space-y-3">
+                                    <div className="flex justify-between text-xs font-bold uppercase"><span>Logged Nodes</span><span className="text-primary-600">{attendanceSummary.reduce((acc, s) => acc + s.total, 0)}</span></div>
+                                    <div className="flex justify-between text-xs font-bold uppercase"><span>Verified Present</span><span className="text-accent-600">{attendanceSummary.reduce((acc, s) => acc + s.present, 0)}</span></div>
+                                </div>
                             </div>
                         </div>
                     </div>
                     
-                    {/* Qualification Dossier Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                          <div className="bg-white dark:bg-gray-900 p-10 rounded-[3.5rem] shadow-xl border border-gray-100 dark:border-gray-800">
                             <SectionHeader icon={BookOpen} num="06" title="Legacy Trace" subtitle="10th Qualification Audit" />
                             <div className="grid grid-cols-2 gap-4">
                                 <InfoBit icon={Database} label="Board" value={student.education10th?.board} />
-                                <InfoBit icon={Trophy} label="Score" value={`${student.education10th?.percentage}%`} color="text-accent-500" />
-                                <div className="col-span-2 p-6 bg-gray-50 dark:bg-gray-800 rounded-3xl">
+                                <InfoBit icon={Award} label="Score" value={`${student.education10th?.percentage}%`} color="text-accent-500" />
+                                <div className="col-span-2 p-6 bg-gray-50 dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700">
                                     <p className="text-[0.5rem] font-black uppercase text-gray-400 mb-1">Institutional Node</p>
-                                    <p className="text-sm font-bold">{student.education10th?.schoolName}</p>
+                                    <p className="text-sm font-bold text-gray-900 dark:text-white uppercase truncate">{student.education10th?.schoolName}</p>
                                 </div>
                             </div>
                          </div>
                          <div className="bg-white dark:bg-gray-900 p-10 rounded-[3.5rem] shadow-xl border border-gray-100 dark:border-gray-800">
-                            <SectionHeader icon={Award} num="06" title="Qualification Alpha" subtitle="Last Exam Audit" />
+                            <SectionHeader icon={ShieldCheck} num="06" title="Qualification Alpha" subtitle="Last Exam Audit" />
                             <div className="grid grid-cols-2 gap-4">
                                 <InfoBit icon={Database} label="Exam" value={student.lastExam?.examType} />
-                                <InfoBit icon={Trophy} label="Score" value={`${student.lastExam?.percentage}%`} color="text-secondary-500" />
-                                <div className="col-span-2 p-6 bg-gray-50 dark:bg-gray-800 rounded-3xl">
+                                <InfoBit icon={Award} label="Score" value={`${student.lastExam?.percentage}%`} color="text-secondary-500" />
+                                <div className="col-span-2 p-6 bg-gray-50 dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700">
                                     <p className="text-[0.5rem] font-black uppercase text-gray-400 mb-1">Institutional Node</p>
-                                    <p className="text-sm font-bold">{student.lastExam?.instituteName}</p>
+                                    <p className="text-sm font-bold text-gray-900 dark:text-white uppercase truncate">{student.lastExam?.instituteName}</p>
                                 </div>
                             </div>
                          </div>

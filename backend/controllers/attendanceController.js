@@ -1,7 +1,10 @@
 import Attendance from '../models/attendanceModel.js';
 import Student from '../models/studentModel.js';
+import Faculty from '../models/facultyModel.js';
+import mongoose from 'mongoose';
 
-// Get daily records for the entry screen
+// @desc    Get daily records for a specific stream/date/subject
+// @route   GET /api/attendance/:streamName/:date
 const getAttendance = async (req, res) => {
     try {
         const { streamName, date } = req.params;
@@ -14,37 +17,85 @@ const getAttendance = async (req, res) => {
         const attendanceRecords = await Attendance.find(query).populate('student', 'firstName lastName');
         res.json(attendanceRecords);
     } catch (error) {
-        res.status(500).json({ message: 'Server Error' });
+        res.status(500).json({ message: 'Server Error during registry fetch' });
     }
 };
 
+// @desc    Get logged in student's own attendance records
+// @route   GET /api/attendance/my-records
 const getMyAttendance = async (req, res) => {
     try {
         if (req.user.role !== 'Student') {
-            return res.status(403).json({ message: 'This route is only for students.' });
+            return res.status(403).json({ message: 'Access Restricted to Student Nodes.' });
         }
         const attendanceRecords = await Attendance.find({ student: req.user.profileId });
         res.json(attendanceRecords);
     } catch (error) {
-        res.status(500).json({ message: 'Server Error fetching your attendance.' });
+        res.status(500).json({ message: 'Internal Registry Error' });
     }
-}
+};
 
-const getAttendanceForStudent = async (req, res) => {
+// @desc    Aggregated Subject-wise summary for student dossier
+// @route   GET /api/attendance/summary/:studentId
+const getStudentAttendanceSummary = async (req, res) => {
     try {
-        const attendanceRecords = await Attendance.find({ student: req.params.studentId });
-        res.json(attendanceRecords);
-    } catch (error) {
-        res.status(500).json({ message: 'Server Error fetching attendance.' });
-    }
-}
+        const { studentId } = req.params;
+        
+        if (!mongoose.Types.ObjectId.isValid(studentId)) {
+            return res.status(400).json({ message: 'Invalid ID sequence' });
+        }
 
+        const summary = await Attendance.aggregate([
+            { $match: { student: new mongoose.Types.ObjectId(studentId) } },
+            {
+                $group: {
+                    _id: "$subject",
+                    total: { $sum: 1 },
+                    present: { $sum: { $cond: [{ $eq: ["$status", "present"] }, 1, 0] } }
+                }
+            },
+            {
+                $project: {
+                    subject: "$_id",
+                    percentage: { 
+                        $round: [
+                            { $multiply: [{ $divide: ["$present", "$total"] }, 100] }, 
+                            1
+                        ] 
+                    },
+                    total: 1,
+                    present: 1
+                }
+            },
+            { $sort: { subject: 1 } }
+        ]);
+        
+        res.json(summary);
+    } catch (error) {
+        console.error("Aggregation Error:", error);
+        res.status(500).json({ message: 'Dossier aggregation failed' });
+    }
+};
+
+// @desc    Commit attendance sequence (Bulk Write)
+// @route   POST /api/attendance
 const saveAttendance = async (req, res) => {
     try {
         const { date, streamName, semester, subject, attendanceData } = req.body;
         
         if (!subject || !semester || !streamName) {
-            return res.status(400).json({ message: 'Missing core criteria (Subject, Semester, or Stream)' });
+            return res.status(400).json({ message: 'Incomplete sequence headers' });
+        }
+
+        // Faculty assignment check
+        if (req.user.role === 'Teacher') {
+            const faculty = await Faculty.findById(req.user.profileId);
+            const isAssigned = faculty.assignedStreams.includes(streamName) && 
+                               faculty.assignedSubjects.includes(subject);
+            
+            if (!isAssigned) {
+                return res.status(403).json({ message: 'Access Denied: You are not assigned to this Stream/Subject node.' });
+            }
         }
 
         const operations = Object.keys(attendanceData).map(studentId => {
@@ -73,13 +124,14 @@ const saveAttendance = async (req, res) => {
             await Attendance.bulkWrite(operations);
         }
         
-        res.status(201).json({ message: 'Attendance saved successfully' });
+        res.status(201).json({ message: 'Registry updated successfully' });
     } catch (error) {
-        console.error("Save Attendance Error:", error);
-        res.status(400).json({ message: 'Failed to save attendance', error: error.message });
+        res.status(400).json({ message: 'Registry commit failed', error: error.message });
     }
 };
 
+// @desc    Stream-wide performance matrix analytics
+// @route   GET /api/attendance/analytics
 const getAttendanceAnalytics = async (req, res) => {
     try {
         const { stream, semester, subject } = req.query;
@@ -89,7 +141,6 @@ const getAttendanceAnalytics = async (req, res) => {
         if (semester && semester !== 'all') matchStage.semester = parseInt(semester);
         if (subject && subject !== 'all') matchStage.subject = subject;
 
-        // 1. Defaulter & Student Percentage
         const studentStats = await Attendance.aggregate([
             { $match: matchStage },
             {
@@ -120,7 +171,6 @@ const getAttendanceAnalytics = async (req, res) => {
             { $sort: { percentage: 1 } }
         ]);
 
-        // 2. Subject Matrix for Chart
         const subjectStats = await Attendance.aggregate([
             { $match: matchStage },
             {
@@ -133,15 +183,15 @@ const getAttendanceAnalytics = async (req, res) => {
             {
                 $project: {
                     subject: "$_id",
-                    percentage: { $multiply: [{ $divide: ["$present", "$total"] }, 100] }
+                    percentage: { $round: [{ $multiply: [{ $divide: ["$present", "$total"] }, 100] }, 1] }
                 }
             }
         ]);
 
-        const totalStudents = await Student.countDocuments(stream !== 'all' ? { stream } : {});
+        const totalStudents = await Student.countDocuments(stream && stream !== 'all' ? { stream } : {});
         const defaulters = studentStats.filter(s => s.percentage < 75).length;
         const avgAttendance = studentStats.length > 0 
-            ? studentStats.reduce((acc, s) => acc + s.percentage, 0) / studentStats.length 
+            ? (studentStats.reduce((acc, s) => acc + s.percentage, 0) / studentStats.length).toFixed(1)
             : 0;
 
         res.json({ 
@@ -149,15 +199,20 @@ const getAttendanceAnalytics = async (req, res) => {
             subjectStats,
             summary: {
                 totalEnrolled: totalStudents,
-                avgAttendance: avgAttendance.toFixed(1),
+                avgAttendance,
                 defaulters
             }
         });
 
     } catch (error) {
-        console.error("Analytics Error:", error);
-        res.status(500).json({ message: 'Server Error fetching analytics' });
+        res.status(500).json({ message: 'Matrix analysis failure' });
     }
 };
 
-export { getAttendance, saveAttendance, getMyAttendance, getAttendanceForStudent, getAttendanceAnalytics };
+export { 
+    getAttendance, 
+    saveAttendance, 
+    getMyAttendance, 
+    getAttendanceAnalytics, 
+    getStudentAttendanceSummary 
+};
