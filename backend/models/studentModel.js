@@ -10,10 +10,10 @@ const studentSchema = mongoose.Schema({
     gender: { type: String, default: 'Select Gender' },
     registrationNumber: { type: String },
     section: { type: String, default: 'A' },
-    photo: { type: String },
+    photo: { type: String }, // Stores URL or Base64
 
     // 2. Contact Information
-    phone: { type: String }, // Made optional for initial registration
+    phone: { type: String },
     whatsappNumber: { type: String },
     isWhatsappSameAsPhone: { type: Boolean, default: false },
     email: { type: String, required: true, unique: true },

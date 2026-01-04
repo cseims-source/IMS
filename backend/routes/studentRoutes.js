@@ -6,6 +6,7 @@ import {
     addStudent, 
     updateStudent, 
     deleteStudent, 
+    bulkDeleteStudents,
     getStudentProfile, 
     getStudentByIdForView, 
     updateStudentProfilePhoto, 
@@ -31,6 +32,7 @@ router.post('/academic-advisor', protect, getAcademicAdvice);
 
 // --- Admin/Teacher Routes ---
 router.get('/stats', protect, teacherOrAdmin, getStudentStats);
+router.route('/bulk-delete').post(protect, admin, bulkDeleteStudents);
 router.route('/import').post(protect, admin, importStudents);
 router.route('/').get(protect, teacherOrAdmin, getStudents).post(protect, admin, addStudent);
 router.route('/stream/:streamName').get(protect, teacherOrAdmin, getStudentsByStream);

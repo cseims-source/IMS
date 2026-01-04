@@ -1,6 +1,8 @@
 import Student from '../models/studentModel.js';
 import Faculty from '../models/facultyModel.js';
 import Marksheet from '../models/marksheetModel.js';
+import AdmissionInquiry from '../models/admissionInquiryModel.js';
+import User from '../models/userModel.js';
 import { GoogleGenAI } from '@google/genai';
 
 const getStudents = async (req, res) => {
@@ -27,7 +29,7 @@ const getStudentStats = async (req, res) => {
     try {
         const totalNodes = await Student.countDocuments();
         const pendingNodes = await Student.countDocuments({ status: 'Pending' });
-        const activeNodes = await Student.countDocuments({ status: 'Active' });
+        const activeNodes = await Student.countDocuments({ status: 'Approved' });
         const recentNodes = await Student.countDocuments({ 
             createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } 
         });
@@ -45,17 +47,44 @@ const getStudentStats = async (req, res) => {
 
 const addStudent = async (req, res) => {
     try {
-        const studentExists = await Student.findOne({ email: req.body.email.toLowerCase() });
+        const email = req.body.email.toLowerCase();
+        const studentExists = await Student.findOne({ email });
         if (studentExists) {
             return res.status(400).json({ message: 'Identity Node already exists with this email.' });
         }
+
         const student = new Student({ 
             ...req.body,
-            email: req.body.email.toLowerCase() 
+            email 
         });
         const createdStudent = await student.save();
+
+        // LOGIC BRIDGE: Map Registry 'Pending' to Inquiry Hub 'New'
+        if (req.body.status === 'Pending') {
+            try {
+                await AdmissionInquiry.create({
+                    name: `${req.body.firstName} ${req.body.lastName || ''}`.trim(),
+                    email: email,
+                    mobile: req.body.phone || '0000000000',
+                    course: req.body.course || 'B.Tech',
+                    branch: req.body.branch || 'General',
+                    academicYear: req.body.academicYear || '2025-26',
+                    state: req.body.presentAddress?.state || 'Odisha',
+                    city: req.body.presentAddress?.city || 'Bhubaneswar',
+                    address: req.body.presentAddress?.address || 'Registry Entry',
+                    status: 'New', // Default status for Inquiries
+                    gender: req.body.gender,
+                    dob: req.body.dob,
+                    notes: 'Auto-generated from Manual Student Registry'
+                });
+            } catch (inquiryErr) {
+                console.error("Failed to bridge Inquiry Node:", inquiryErr);
+            }
+        }
+
         res.status(201).json(createdStudent);
     } catch (error) {
+        console.error("Student Add Error:", error);
         res.status(400).json({ message: 'Invalid data sequence', error: error.message });
     }
 };
@@ -80,6 +109,7 @@ const deleteStudent = async (req, res) => {
     try {
         const student = await Student.findById(req.params.id);
         if (student) {
+            await User.deleteOne({ email: student.email });
             await student.deleteOne();
             res.json({ message: 'Node purged' });
         } else {
@@ -87,6 +117,25 @@ const deleteStudent = async (req, res) => {
         }
     } catch (error) {
         res.status(500).json({ message: 'Purge protocol error' });
+    }
+};
+
+const bulkDeleteStudents = async (req, res) => {
+    try {
+        const { ids } = req.body;
+        if (!ids || !Array.isArray(ids)) {
+            return res.status(400).json({ message: 'Invalid ID sequence provided.' });
+        }
+        
+        const students = await Student.find({ _id: { $in: ids } });
+        const emails = students.map(s => s.email);
+        
+        await User.deleteMany({ email: { $in: emails } });
+        await Student.deleteMany({ _id: { $in: ids } });
+        
+        res.json({ message: `${ids.length} nodes successfully purged from registry.` });
+    } catch (error) {
+        res.status(500).json({ message: 'Bulk purge protocol failed.' });
     }
 };
 
@@ -128,17 +177,9 @@ const getStudentsByStream = async (req, res) => {
     try {
         const { streamName } = req.params;
         const { semester } = req.query;
-        
-        // fuzzy matching for stream to handle B.Tech / MBA prefixes
-        const query = { 
-            stream: { $regex: streamName, $options: 'i' }
-        };
-        
-        if (semester) {
-            query.currentSemester = parseInt(semester);
-        }
+        const query = { stream: { $regex: streamName, $options: 'i' } };
+        if (semester) query.currentSemester = parseInt(semester);
 
-        // Permission Check: Admin can see anyone, Teachers only assigned
         if (req.user.role === 'Teacher') {
             const teacher = await Faculty.findById(req.user.profileId);
             if (!teacher.assignedStreams.some(s => s.toLowerCase().includes(streamName.toLowerCase()))) {
@@ -235,7 +276,7 @@ const getAcademicAdvice = async (req, res) => {
 };
 
 export { 
-    getStudents, getStudentStats, getStudentsByStream, addStudent, updateStudent, deleteStudent, 
+    getStudents, getStudentStats, getStudentsByStream, addStudent, updateStudent, deleteStudent, bulkDeleteStudents,
     getStudentProfile, getStudentByIdForView, updateStudentProfilePhoto, importStudents,
     getStudentFees, addStudentFee, updateFeeStatus, getMyFees, payMyFee,
     getAcademicAdvice

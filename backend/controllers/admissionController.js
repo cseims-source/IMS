@@ -47,11 +47,17 @@ const updateInquiry = async (req, res) => {
 
         const { status, notes } = req.body;
         
-        // If accepted, create or update a Student record
+        // LOGIC SYNC: If accepted, update OR create student node
         if (status === 'Accepted' && inquiry.status !== 'Accepted') {
-            const studentExists = await Student.findOne({ email: inquiry.email.toLowerCase() });
-            if (!studentExists) {
-                // Parse first/last name
+            const email = inquiry.email.toLowerCase();
+            const student = await Student.findOne({ email });
+
+            if (student) {
+                // Node exists (added via manual registry as Pending), upgrade to Approved
+                student.status = 'Approved';
+                await student.save();
+            } else {
+                // New lead from public form, initialize student profile
                 const nameParts = inquiry.name.trim().split(/\s+/);
                 const firstName = nameParts[0];
                 const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
@@ -59,7 +65,7 @@ const updateInquiry = async (req, res) => {
                 await Student.create({
                     firstName,
                     lastName,
-                    email: inquiry.email.toLowerCase(),
+                    email: email,
                     phone: inquiry.mobile,
                     gender: inquiry.gender,
                     dob: inquiry.dob,
@@ -73,8 +79,17 @@ const updateInquiry = async (req, res) => {
                     },
                     education10th: inquiry.education10th,
                     lastExam: inquiry.lastExam,
-                    status: 'Approved'
+                    status: 'Approved' // Synced with inquiry 'Accepted'
                 });
+            }
+        }
+
+        // Handle Rejection Sync
+        if (status === 'Rejected' && inquiry.status !== 'Rejected') {
+            const student = await Student.findOne({ email: inquiry.email.toLowerCase() });
+            if (student) {
+                student.status = 'Rejected';
+                await student.save();
             }
         }
 

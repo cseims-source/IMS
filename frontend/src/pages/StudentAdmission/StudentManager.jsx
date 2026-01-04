@@ -2,7 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
     Edit, Trash2, Upload, Eye, Search, Printer,
     FileDown, Sparkles, Database, Users, Activity, Clock, 
-    RefreshCw, Filter, ShieldCheck, UserPlus, GraduationCap
+    RefreshCw, Filter, ShieldCheck, UserPlus, GraduationCap,
+    CheckSquare, Square, AlertTriangle, X
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -40,7 +41,9 @@ export default function StudentManager() {
   const [editingStudent, setEditingStudent] = useState(null);
   const [viewingStudent, setViewingStudent] = useState(null);
   const [deletingStudent, setDeletingStudent] = useState(null);
+  const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedIds, setSelectedIds] = useState(new Set());
   const { api, user } = useAuth();
   const { addToast } = useNotification();
 
@@ -53,6 +56,7 @@ export default function StudentManager() {
   const fetchAll = async () => {
       fetchStudents();
       fetchStats();
+      setSelectedIds(new Set());
   }
 
   const fetchStudents = async () => {
@@ -84,6 +88,8 @@ export default function StudentManager() {
       const exportData = students.map(s => ({
           'Identity': `${s.firstName} ${s.lastName}`,
           'Registry Email': s.email,
+          'Course': s.course,
+          'Branch': s.branch,
           'Academic Module': s.stream,
           'Registration ID': s.registrationNumber,
           'Section': s.section || 'A',
@@ -102,9 +108,25 @@ export default function StudentManager() {
         `${student.firstName} ${student.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (student.registrationNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (student.phone || '').includes(searchTerm) ||
-        student.stream?.toLowerCase().includes(searchTerm.toLowerCase())
+        student.course?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        student.branch?.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [students, searchTerm]);
+
+  const handleSelectOne = (id) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedIds(next);
+  };
+
+  const handleSelectAll = () => {
+    if (selectedIds.size === processedStudents.length) {
+        setSelectedIds(new Set());
+    } else {
+        setSelectedIds(new Set(processedStudents.map(s => s._id)));
+    }
+  };
 
   const handleAddNew = () => { setEditingStudent(null); setIsFormOpen(true); }
   const handleEdit = (student) => { setEditingStudent(student); setIsFormOpen(true); }
@@ -134,6 +156,20 @@ export default function StudentManager() {
       }
   }
 
+  const handleBulkDelete = async () => {
+      try {
+          await api('/api/students/bulk-delete', {
+              method: 'POST',
+              body: JSON.stringify({ ids: Array.from(selectedIds) })
+          });
+          addToast(`${selectedIds.size} nodes purged from registry.`, 'success');
+          setIsBulkDeleteOpen(false);
+          fetchAll();
+      } catch (error) {
+          addToast('Bulk purge failed.', 'error');
+      }
+  };
+
   const handleImportSuccess = () => {
       setIsImportModalOpen(false);
       fetchAll();
@@ -151,6 +187,11 @@ export default function StudentManager() {
                 </p>
             </div>
             <div className="flex flex-wrap gap-3 w-full lg:w-auto">
+                {isAdmin && selectedIds.size > 0 && (
+                    <button onClick={() => setIsBulkDeleteOpen(true)} className="flex-1 lg:flex-none flex items-center justify-center px-6 py-3 bg-red-500 text-white rounded-2xl font-black uppercase text-[0.6rem] tracking-[0.2em] hover:bg-red-600 transition-all shadow-xl shadow-red-500/30 active:scale-95 animate-pulse">
+                        <Trash2 size={16} className="mr-2" /> Purge {selectedIds.size} Nodes
+                    </button>
+                )}
                 <button onClick={handleExportExcel} className="flex-1 lg:flex-none flex items-center justify-center px-6 py-3 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-100 dark:border-gray-700 rounded-2xl font-black uppercase text-[0.6rem] tracking-[0.2em] hover:bg-gray-50 transition-all shadow-xl active:scale-95 group">
                     <FileDown size={16} className="mr-2 group-hover:translate-y-1 transition-transform" /> Registry Export
                 </button>
@@ -194,7 +235,7 @@ export default function StudentManager() {
                 <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary-500 transition-colors" size={18} />
                 <input 
                     type="text"
-                    placeholder="Scan Identity Markers (Name, Reg No, Phone, Stream)..."
+                    placeholder="Scan Identity Markers (Name, Reg No, Phone, Course, Branch)..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full pl-14 pr-8 py-4 bg-gray-50 dark:bg-gray-950 border-0 rounded-3xl focus:ring-4 focus:ring-primary-500/5 text-[0.85rem] font-bold shadow-inner transition-all"
@@ -220,22 +261,35 @@ export default function StudentManager() {
                     <table className="w-full text-left">
                         <thead className="bg-gray-50 dark:bg-gray-900/80 sticky top-0 z-10">
                             <tr className="text-[0.55rem] font-black uppercase tracking-[0.25em] text-gray-500 border-b dark:border-gray-800">
-                                <th className="p-5 pl-8">SI No</th>
+                                <th className="p-5 pl-8">
+                                    {isAdmin && (
+                                        <button onClick={handleSelectAll} className="p-2 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-lg transition-colors">
+                                            {selectedIds.size === processedStudents.length ? <CheckSquare className="text-primary-500" size={16} /> : <Square size={16} />}
+                                        </button>
+                                    )}
+                                </th>
+                                <th className="p-5">SI No</th>
                                 <th className="p-5">Photo</th>
                                 <th className="p-5">Student Name</th>
                                 <th className="p-5">Reg. No</th>
                                 <th className="p-5">Phone</th>
-                                <th className="p-5">Course</th>
+                                <th className="p-5">Course / Branch</th>
                                 <th className="p-5">Academic Year</th>
-                                <th className="p-5 text-center">Section</th>
                                 <th className="p-5 text-center">Status</th>
                                 <th className="p-5 text-right pr-10">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y dark:divide-gray-800">
                             {processedStudents.map((student, idx) => (
-                                <tr key={student._id} className="hover:bg-primary-50/20 dark:hover:bg-primary-900/10 transition-all group animate-fade-in-up" style={{ animationDelay: `${idx * 20}ms` }}>
+                                <tr key={student._id} className={`hover:bg-primary-50/20 dark:hover:bg-primary-900/10 transition-all group animate-fade-in-up ${selectedIds.has(student._id) ? 'bg-primary-50/10' : ''}`} style={{ animationDelay: `${idx * 20}ms` }}>
                                     <td className="p-4 pl-8">
+                                        {isAdmin && (
+                                            <button onClick={() => handleSelectOne(student._id)} className="p-2 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-lg transition-colors">
+                                                {selectedIds.has(student._id) ? <CheckSquare className="text-primary-500" size={16} /> : <Square size={16} />}
+                                            </button>
+                                        )}
+                                    </td>
+                                    <td className="p-4">
                                         <span className="font-mono text-[0.7rem] font-black text-gray-400 group-hover:text-primary-600 transition-colors">{idx + 1}</span>
                                     </td>
                                     <td className="p-4">
@@ -257,17 +311,17 @@ export default function StudentManager() {
                                         <span className="text-[0.65rem] text-gray-600 dark:text-gray-300 font-black">{student.phone}</span>
                                     </td>
                                     <td className="p-4">
-                                        <span className="px-2.5 py-1 bg-primary-100 dark:bg-primary-900/50 text-primary-600 dark:text-primary-300 text-[0.55rem] font-black uppercase rounded-lg border border-primary-200/50">{student.course}</span>
+                                        <div className="flex flex-col gap-1">
+                                            <span className="px-2 py-0.5 bg-primary-100 dark:bg-primary-900/50 text-primary-600 dark:text-primary-300 text-[0.55rem] font-black uppercase rounded-md border border-primary-200/50 w-fit">{student.course}</span>
+                                            <span className="text-[0.55rem] text-gray-400 font-bold uppercase tracking-widest">{student.branch}</span>
+                                        </div>
                                     </td>
                                     <td className="p-4">
                                         <span className="text-[0.6rem] text-gray-500 font-black uppercase tracking-widest">{student.academicYear}</span>
                                     </td>
                                     <td className="p-4 text-center">
-                                        <span className="w-8 h-8 rounded-lg border border-gray-100 dark:border-gray-800 inline-flex items-center justify-center text-[0.65rem] font-black text-primary-500 uppercase">{student.section || 'A'}</span>
-                                    </td>
-                                    <td className="p-4 text-center">
                                         <span className={`px-3 py-1 rounded-lg text-[0.5rem] font-black uppercase tracking-[0.2em] shadow-sm ${
-                                            student.status === 'Active' ? 'bg-green-100 text-green-700 border border-green-200' : 
+                                            student.status === 'Approved' ? 'bg-green-100 text-green-700 border border-green-200' : 
                                             student.status === 'Rejected' ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-yellow-100 text-yellow-800 border border-yellow-200'
                                         }`}>
                                             {student.status || 'Pending'}
@@ -298,10 +352,11 @@ export default function StudentManager() {
         {isImportModalOpen && <StudentImportModal onClose={() => setIsImportModalOpen(false)} onImportSuccess={handleImportSuccess} />}
         {viewingStudent && <StudentDetailModal student={viewingStudent} onClose={() => setViewingStudent(null)} />}
         
+        {/* Single Delete Confirmation */}
         {deletingStudent && (
-            <div className="fixed inset-0 bg-gray-950/90 backdrop-blur-xl flex justify-center items-center z-[200] p-4 animate-fade-in">
+            <div className="fixed inset-0 bg-gray-950/90 backdrop-blur-xl flex justify-center items-center z-[500] p-4 animate-fade-in">
                 <div className="bg-white dark:bg-gray-900 p-10 rounded-[3rem] shadow-3xl w-full max-w-md border border-white/10 text-center animate-scale-in">
-                    <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 text-red-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-[0_0_40px_rgba(239,68,68,0.2)] animate-pulse">
+                    <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 text-red-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-[0_0_40px_rgba(239,68,68,0.2)]">
                         <Trash2 size={40} />
                     </div>
                     <h2 className="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tighter mb-4">Registry Wipe</h2>
@@ -309,8 +364,27 @@ export default function StudentManager() {
                         Confirm permanent decommissioning of student node <span className="text-red-500 font-black">"{deletingStudent.firstName}"</span> from institutional logic.
                     </p>
                     <div className="flex gap-4">
-                        <button onClick={() => setDeletingStudent(null)} className="flex-1 py-4 bg-gray-100 dark:bg-gray-800 text-gray-500 font-black uppercase text-[0.65rem] tracking-[0.3em] rounded-2xl">Abort Sequence</button>
-                        <button onClick={confirmDelete} className="flex-1 py-4 bg-red-600 text-white font-black uppercase text-[0.65rem] tracking-[0.3em] rounded-2xl shadow-xl shadow-red-500/30 active:scale-95 transition-transform">Wipe Node</button>
+                        <button onClick={() => setDeletingStudent(null)} className="flex-1 py-4 bg-gray-100 dark:bg-gray-800 text-gray-500 font-black uppercase text-[0.65rem] tracking-[0.3em] rounded-2xl active:scale-95 transition-all">Abort Sequence</button>
+                        <button onClick={confirmDelete} className="flex-1 py-4 bg-red-600 text-white font-black uppercase text-[0.65rem] tracking-[0.3em] rounded-2xl shadow-xl shadow-red-500/30 active:scale-95 transition-all">Wipe Node</button>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* Bulk Delete Confirmation */}
+        {isBulkDeleteOpen && (
+            <div className="fixed inset-0 bg-gray-950/95 backdrop-blur-2xl flex justify-center items-center z-[500] p-4 animate-fade-in">
+                <div className="bg-white dark:bg-gray-900 p-12 rounded-[4rem] shadow-3xl w-full max-w-lg border border-red-500/20 text-center animate-scale-in">
+                    <div className="w-24 h-24 bg-red-500 text-white rounded-full flex items-center justify-center mx-auto mb-8 shadow-[0_0_60px_rgba(239,68,68,0.4)] animate-pulse">
+                        <AlertTriangle size={48} />
+                    </div>
+                    <h2 className="text-4xl font-black text-gray-900 dark:text-white uppercase tracking-tighter mb-4">Mass Purge</h2>
+                    <p className="text-[0.75rem] text-gray-400 mb-10 font-bold uppercase tracking-widest leading-loose">
+                        You are about to permanently disconnect <span className="text-red-500 font-black text-lg">{selectedIds.size}</span> student nodes from the institutional cloud registry. This action cannot be reversed.
+                    </p>
+                    <div className="flex gap-6">
+                        <button onClick={() => setIsBulkDeleteOpen(false)} className="flex-1 py-5 bg-gray-100 dark:bg-gray-800 text-gray-500 font-black uppercase text-xs tracking-widest rounded-3xl">Abort Protocol</button>
+                        <button onClick={handleBulkDelete} className="flex-1 py-5 bg-red-600 text-white font-black uppercase text-xs tracking-widest rounded-3xl shadow-2xl shadow-red-500/40">Execute Purge</button>
                     </div>
                 </div>
             </div>
