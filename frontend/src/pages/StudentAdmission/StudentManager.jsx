@@ -104,13 +104,20 @@ export default function StudentManager() {
   };
 
   const processedStudents = useMemo(() => {
-    return students.filter(student =>
-        `${student.firstName} ${student.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (student.registrationNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (student.phone || '').includes(searchTerm) ||
-        student.course?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        student.branch?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    return students
+        .filter(student =>
+            `${student.firstName} ${student.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (student.registrationNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (student.phone || '').includes(searchTerm) ||
+            student.course?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            student.branch?.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+        .sort((a, b) => {
+            const regA = a.registrationNumber || '';
+            const regB = b.registrationNumber || '';
+            // Natural Alphanumeric Sort (e.g., F1 comes before F10)
+            return regA.localeCompare(regB, undefined, { numeric: true, sensitivity: 'base' });
+        });
   }, [students, searchTerm]);
 
   const handleSelectOne = (id) => {

@@ -79,23 +79,44 @@ export const importFaculty = async (req, res) => {
 
     try {
         const results = { imported: 0, failed: 0, errors: [] };
+        
+        // Fetch all existing emails to prevent duplicates in memory first
+        const existingEmails = new Set(
+            (await Faculty.find({}, 'email')).map(f => f.email.toLowerCase())
+        );
+
+        const newNodes = [];
+
         for (const f of facultyMembers) {
             try {
-                const email = f.email?.toLowerCase();
-                if (!email) throw new Error('Missing Email');
+                const email = f.email?.toLowerCase().trim();
+                if (!email) throw new Error('Missing Identity Email');
                 
-                const exists = await Faculty.findOne({ email });
-                if (exists) throw new Error('Duplicate Identity');
+                if (existingEmails.has(email)) {
+                    throw new Error('Duplicate Identity Logged');
+                }
 
-                await Faculty.create({ ...f, email });
+                newNodes.push({
+                    ...f,
+                    email,
+                    status: f.status || 'Active'
+                });
+                
+                existingEmails.add(email);
                 results.imported++;
             } catch (err) {
                 results.failed++;
                 results.errors.push({ node: f.name || 'Unknown', reason: err.message });
             }
         }
+
+        if (newNodes.length > 0) {
+            await Faculty.insertMany(newNodes, { ordered: false });
+        }
+
         res.status(201).json(results);
     } catch (error) {
-        res.status(500).json({ message: 'Bulk injection failed.' });
+        console.error("Bulk Import Error:", error);
+        res.status(500).json({ message: 'Bulk injection failed.', details: error.message });
     }
 };
