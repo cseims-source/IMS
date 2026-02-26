@@ -45,12 +45,19 @@ export const getTeacherDashboardStats = async (req, res) => {
         const teacher = await Faculty.findById(req.user.profileId);
         if (!teacher) return res.status(404).json({ message: 'Teacher profile not found' });
 
+        const assignedStreamIds = teacher.assignedStreamIds?.length
+            ? teacher.assignedStreamIds
+            : [...new Set((teacher.workload || []).map(w => w.streamId).filter(Boolean))];
         const assignedStreams = teacher.assignedStreams || [];
-        const studentCount = assignedStreams.length > 0 ? await Student.countDocuments({ stream: { $in: assignedStreams } }) : 0;
+        const studentCount = assignedStreamIds.length > 0
+            ? await Student.countDocuments({ streamId: { $in: assignedStreamIds } })
+            : (assignedStreams.length > 0 ? await Student.countDocuments({ stream: { $in: assignedStreams } }) : 0);
         
         const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
         const today = daysOfWeek[new Date().getDay()];
-        const timetables = await Timetable.find({ stream: { $in: assignedStreams } });
+        const timetables = assignedStreamIds.length > 0
+            ? await Timetable.find({ streamId: { $in: assignedStreamIds } })
+            : await Timetable.find({ stream: { $in: assignedStreams } });
         
         let scheduleToday = [];
         timetables.forEach(tt => {
@@ -85,7 +92,9 @@ export const getStudentDashboardSummary = async (req, res) => {
 
         const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
         const today = daysOfWeek[new Date().getDay()];
-        const timetable = await Timetable.findOne({ stream: student.stream, semester: student.currentSemester });
+        const timetable = student.streamId
+            ? await Timetable.findOne({ streamId: student.streamId, semester: student.currentSemester })
+            : await Timetable.findOne({ stream: student.stream, semester: student.currentSemester });
         
         let scheduleToday = [];
         if (timetable?.schedule?.has(today)) {
@@ -96,7 +105,7 @@ export const getStudentDashboardSummary = async (req, res) => {
         }
 
         const latestNotices = await Notice.find({}).sort({ createdAt: -1 }).limit(3);
-        const recentMarksheet = await Marksheet.findOne({ student: student._id }).sort({ createdAt: -1 });
+        const recentMarksheet = await Marksheet.findOne({ student: student._id, status: 'published' }).sort({ createdAt: -1 });
         const upcomingEvents = await Event.find({ date: { $gte: new Date().toISOString().split('T')[0] } }).sort({ date: 1 }).limit(3);
 
         res.json({
@@ -159,7 +168,7 @@ export const getDashboardCharts = async (req, res) => {
         ]);
 
         const attendanceTrend = await Attendance.aggregate([
-            { $group: { _id: "$date", present: { $sum: { $cond: [{ $eq: ["$status", "present"] }, 1, 0] } }, total: { $sum: 1 } } },
+            { $group: { _id: "$date", present: { $sum: { $cond: [{ $in: ["$status", ["present", "late"]] }, 1, 0] } }, total: { $sum: 1 } } },
             { $project: { date: "$_id", rate: { $multiply: [{ $divide: ["$present", "$total"] }, 100] } } },
             { $sort: { date: 1 } },
             { $limit: 7 }

@@ -7,15 +7,7 @@ import {
     Users, CreditCard, ClipboardCheck, Smartphone, AlertCircle,
     Bookmark, ShieldCheck, MessageSquare, PlusCircle, Trophy, Bus
 } from 'lucide-react';
-
-const COURSES = ['B.Tech', 'M.Tech', 'MBA', 'MCA', 'Diploma'];
-const BRANCHES = {
-    'B.Tech': ['Computer Science', 'Civil Engineering', 'Electrical Engineering', 'Mechanical Engineering', 'Electronics & Comm.'],
-    'M.Tech': ['Computer Science', 'Power Systems', 'Structural Engineering', 'VLSI Design'],
-    'MBA': ['Marketing', 'Finance', 'HR', 'Operations'],
-    'MCA': ['General'],
-    'Diploma': ['Civil', 'Electrical', 'Mechanical']
-};
+import { useAuth } from '../../contexts/AuthContext';
 
 const DOC_LIST = [
     '10th Class Certificate', '10th Class Mark sheet', 
@@ -94,7 +86,13 @@ const Select = ({ label, name, value, onChange, options, required, disabled }) =
 
 export default function StudentAdmissionForm({ student, onSave, onCancel }) {
     const fileInputRef = useRef(null);
+    const { api } = useAuth();
     
+    // Dynamic Curriculum States
+    const [streams, setStreams] = useState([]);
+    const [courseOptions, setCourseOptions] = useState([]);
+    const [branchOptions, setBranchOptions] = useState([]);
+
     const [formData, setFormData] = useState({
         enquiryId: `ENQ-${new Date().getTime().toString().slice(-6)}`,
         status: 'Pending',
@@ -118,6 +116,13 @@ export default function StudentAdmissionForm({ student, onSave, onCancel }) {
     });
 
     useEffect(() => {
+        // Fetch official curriculum logic from DB
+        api('/api/streams').then(data => {
+            setStreams(data);
+            const courses = [...new Set(data.map(s => s.level))];
+            setCourseOptions(courses);
+        }).catch(console.error);
+
         if (student) {
             setFormData({
                 ...student,
@@ -132,7 +137,19 @@ export default function StudentAdmissionForm({ student, onSave, onCancel }) {
                 yearFees: student.yearFees || formData.yearFees
             });
         }
-    }, [student]);
+    }, [student, api]);
+
+    // Handle course change to filter branch options
+    useEffect(() => {
+        if (formData.course) {
+            const filtered = streams
+                .filter(s => s.level === formData.course)
+                .map(s => s.name);
+            setBranchOptions(filtered);
+        } else {
+            setBranchOptions([]);
+        }
+    }, [formData.course, streams]);
 
     const handleDeepChange = (e, path) => {
         const { name, value } = e.target;
@@ -140,15 +157,16 @@ export default function StudentAdmissionForm({ student, onSave, onCancel }) {
         setFormData(prev => {
             let next = JSON.parse(JSON.stringify(prev));
             let current = next;
-            for (let i = 0; i < keys.length; i++) {
+            for (let i = 0; i < keys.length - 1; i++) {
                 if (!current[keys[i]]) current[keys[i]] = {};
                 current = current[keys[i]];
             }
-            current[name] = value;
+            current[keys[keys.length - 1]][name] = value;
             if (path === 'education10th' || path === 'lastExam') {
-                const total = Number(current.totalMarks) || 0;
-                const secured = Number(current.marksSecured) || 0;
-                if (total > 0) current.percentage = ((secured / total) * 100).toFixed(2);
+                const node = current[keys[keys.length-1]];
+                const total = Number(node.totalMarks) || 0;
+                const secured = Number(node.marksSecured) || 0;
+                if (total > 0) node.percentage = ((secured / total) * 100).toFixed(2);
             }
             return next;
         });
@@ -177,14 +195,13 @@ export default function StudentAdmissionForm({ student, onSave, onCancel }) {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        onSave({ ...formData, stream: `${formData.course} ${formData.branch}`.trim() });
+        onSave({ ...formData, stream: formData.branch || 'Unassigned' });
     };
 
     return (
         <div className="fixed inset-0 bg-gray-950/95 backdrop-blur-xl flex justify-center items-center z-[300] p-4 overflow-hidden">
             <div className="bg-white dark:bg-gray-900 rounded-[3.5rem] shadow-2xl w-full max-w-6xl h-[95vh] flex flex-col border border-white/10 animate-scale-in relative">
                 
-                {/* Header Sequence */}
                 <div className="p-8 border-b dark:border-gray-800 flex items-center justify-between bg-white dark:bg-gray-900 z-10 shadow-sm">
                     <div className="flex items-center gap-6">
                         <div className="p-3 bg-primary-600 rounded-2xl text-white shadow-xl shadow-primary-500/30">
@@ -194,7 +211,7 @@ export default function StudentAdmissionForm({ student, onSave, onCancel }) {
                             <h2 className="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tighter leading-none">
                                 Student <span className="text-primary-600">Onboarding</span>
                             </h2>
-                            <p className="text-[0.6rem] font-bold text-gray-400 uppercase tracking-[0.5em] mt-2">Institutional Registry Hub • Logic V4.5</p>
+                            <p className="text-[0.6rem] font-bold text-gray-400 uppercase tracking-[0.5em] mt-2">Institutional Registry Hub // Dynamic Sync</p>
                         </div>
                     </div>
                     <button onClick={onCancel} className="p-3 bg-gray-50 dark:bg-gray-800 text-gray-400 hover:text-red-500 rounded-2xl transition-all active:scale-90">
@@ -204,7 +221,6 @@ export default function StudentAdmissionForm({ student, onSave, onCancel }) {
 
                 <form onSubmit={handleSubmit} className="flex-grow overflow-y-auto p-12 scrollbar-hide space-y-16 pb-32">
                     
-                    {/* 1. Personal Information */}
                     <section className="bg-gray-50/50 dark:bg-gray-950/30 p-10 rounded-[3rem] border border-gray-100 dark:border-gray-800 shadow-inner">
                         <SectionHeader icon={User} num="01" title="Personal Information" subtitle="Primary Identity Verification" />
                         <div className="grid grid-cols-1 md:grid-cols-12 gap-12">
@@ -236,7 +252,6 @@ export default function StudentAdmissionForm({ student, onSave, onCancel }) {
                         </div>
                     </section>
 
-                    {/* 2. Contact Information */}
                     <section className="p-10 rounded-[3rem] bg-white dark:bg-gray-950 border border-gray-100 dark:border-gray-800">
                         <SectionHeader icon={Smartphone} num="02" title="Contact Information" subtitle="Registry Communications" />
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -248,19 +263,17 @@ export default function StudentAdmissionForm({ student, onSave, onCancel }) {
                         </div>
                     </section>
 
-                    {/* 3. Academic Information */}
                     <section className="p-10 rounded-[3rem] bg-primary-50 dark:bg-primary-900/10 border border-primary-100 dark:border-primary-900/20">
                         <SectionHeader icon={GraduationCap} num="03" title="Academic Information" subtitle="Course Stream Logic" />
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
                             <Select label="Academic Year" name="academicYear" value={formData.academicYear} onChange={handleSimpleChange} required options={['2024-25', '2025-26', '2026-27']} />
-                            <Select label="Course Node" name="course" value={formData.course} onChange={handleSimpleChange} required options={COURSES} />
-                            <Select label="Branch Node" name="branch" value={formData.branch} onChange={handleSimpleChange} required options={formData.course ? BRANCHES[formData.course] : []} />
+                            <Select label="Level Node" name="course" value={formData.course} onChange={handleSimpleChange} required options={courseOptions} />
+                            <Select label="Branch Logic" name="branch" value={formData.branch} onChange={handleSimpleChange} required options={branchOptions} />
                             <Select label="Batch Cycle" name="batchYear" value={formData.batchYear} onChange={handleSimpleChange} options={['2023', '2024', '2025', '2026']} />
                             <Input label="Admission Date" name="admissionDate" type="date" value={formData.admissionDate} onChange={handleSimpleChange} />
                         </div>
                     </section>
 
-                    {/* 4. Entrance & Identification (NEW) */}
                     <section className="p-10 rounded-[3rem] bg-white dark:bg-gray-950 border border-gray-100 dark:border-gray-800">
                         <SectionHeader icon={Trophy} num="04" title="Entrance & Identification" subtitle="Competitive Logic Trace" />
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -271,7 +284,6 @@ export default function StudentAdmissionForm({ student, onSave, onCancel }) {
                         </div>
                     </section>
 
-                    {/* 5. Institutional Services (NEW) */}
                     <section className="p-10 rounded-[3rem] bg-accent-50/30 dark:bg-accent-900/10 border border-accent-100 dark:border-accent-900/30">
                         <SectionHeader icon={Bus} num="05" title="Campus Services" subtitle="Logistics Preference" />
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -280,7 +292,6 @@ export default function StudentAdmissionForm({ student, onSave, onCancel }) {
                         </div>
                     </section>
 
-                    {/* 6. Previous Education */}
                     <section className="p-10 rounded-[3rem] bg-white dark:bg-gray-950 border border-gray-100 dark:border-gray-800">
                         <SectionHeader icon={BookOpen} num="06" title="Educational Trace" subtitle="History Audit" />
                         <div className="space-y-12">
@@ -307,7 +318,6 @@ export default function StudentAdmissionForm({ student, onSave, onCancel }) {
                         </div>
                     </section>
 
-                    {/* 7. Family Information */}
                     <section className="p-10 rounded-[3rem] bg-gray-50/50 dark:bg-gray-950/30 border border-gray-100 dark:border-gray-800">
                         <SectionHeader icon={Users} num="07" title="Family Information" subtitle="Genealogical Data" />
                         <div className="space-y-12">
@@ -335,7 +345,6 @@ export default function StudentAdmissionForm({ student, onSave, onCancel }) {
                         </div>
                     </section>
 
-                    {/* 8. Additional Information */}
                     <section className="p-10 rounded-[3rem] bg-white dark:bg-gray-950 border border-gray-100 dark:border-gray-800 shadow-sm">
                         <SectionHeader icon={Sparkles} num="08" title="Additional Information" subtitle="Modifiers" />
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -345,7 +354,6 @@ export default function StudentAdmissionForm({ student, onSave, onCancel }) {
                         </div>
                     </section>
 
-                    {/* 9. Address Information */}
                     <section className="p-10 rounded-[3rem] bg-gray-50/50 dark:bg-gray-950/30 border border-gray-100 dark:border-gray-800">
                         <SectionHeader icon={MapPin} num="09" title="Address Information" subtitle="Coordinates" />
                         <div className="space-y-12">
@@ -385,7 +393,6 @@ export default function StudentAdmissionForm({ student, onSave, onCancel }) {
                         </div>
                     </section>
 
-                    {/* 10. Document Tracking */}
                     <section className="p-10 rounded-[3rem] bg-white dark:bg-gray-950 border border-gray-100 dark:border-gray-800">
                         <SectionHeader icon={ClipboardCheck} num="10" title="Document Tracking" subtitle="Asset Audit" />
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
@@ -413,7 +420,6 @@ export default function StudentAdmissionForm({ student, onSave, onCancel }) {
                         </div>
                     </section>
 
-                    {/* 11. Fee Information */}
                     <section className="p-10 rounded-[3.5rem] bg-gradient-to-br from-gray-900 to-primary-900 text-white shadow-2xl relative overflow-hidden">
                         <SectionHeader icon={CreditCard} num="11" title="Financial Matrix" subtitle="Institutional Ledger" />
                         <div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">

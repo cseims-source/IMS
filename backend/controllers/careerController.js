@@ -83,3 +83,35 @@ export const getCareerAdvice = async (req, res) => {
         res.status(500).json({ message: 'Failed to generate AI career advice.' });
     }
 };
+
+// @desc    Get career metrics for student dashboard
+// @route   GET /api/career/metrics
+// @access  Student
+export const getCareerMetrics = async (req, res) => {
+    try {
+        if (req.user.role !== 'Student') return res.status(403).json({ message: 'Access denied' });
+        const student = await Student.findById(req.user.profileId).lean();
+        if (!student) return res.status(404).json({ message: 'Student profile not found.' });
+
+        const marksheets = await Marksheet.find({ student: req.user.profileId }).lean();
+        const avgPercentage = marksheets.length
+            ? (marksheets.reduce((acc, m) => acc + (m.percentage || 0), 0) / marksheets.length).toFixed(2)
+            : null;
+        const latestResult = marksheets.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+
+        const applications = await PlacementApplication.find({ student: req.user._id }).countDocuments();
+        const openJobs = await PlacementJob.countDocuments({ status: 'Open' });
+
+        res.json({
+            stream: student.stream,
+            semester: student.currentSemester,
+            avgPercentage,
+            latestExam: latestResult?.exam || null,
+            latestGrade: latestResult?.grade || null,
+            applications,
+            openJobs
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to load career metrics.' });
+    }
+};

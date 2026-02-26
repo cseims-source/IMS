@@ -19,8 +19,9 @@ export function AuthProvider({ children }) {
     // Prepend the base URL for production readiness
     const fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
 
+    const isFormData = options?.body instanceof FormData;
     const headers = {
-      'Content-Type': 'application/json',
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...options.headers,
     };
 

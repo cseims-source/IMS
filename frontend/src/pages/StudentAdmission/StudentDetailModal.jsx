@@ -14,13 +14,13 @@ const SectionHeader = ({ icon: Icon, title, color = "text-primary-500" }) => (
     </div>
 );
 
-const InfoBit = ({ label, value, icon: Icon }) => (
+const InfoBit = ({ label, value, icon: Icon, dark = false }) => (
     <div className="space-y-1.5 group">
         <div className="flex items-center gap-2">
-            {Icon && <Icon size={10} className="text-gray-400" />}
-            <span className="text-[0.55rem] font-black uppercase tracking-widest text-gray-400 group-hover:text-primary-500 transition-colors">{label}</span>
+            {Icon && <Icon size={10} className={dark ? "text-primary-300" : "text-gray-400"} />}
+            <span className={`text-[0.55rem] font-black uppercase tracking-widest group-hover:text-primary-500 transition-colors ${dark ? 'text-primary-200/70' : 'text-gray-400'}`}>{label}</span>
         </div>
-        <p className="text-[0.7rem] font-bold text-gray-800 dark:text-gray-100 break-words">{value || '---'}</p>
+        <p className={`text-[0.7rem] font-bold break-words ${dark ? 'text-white print:text-black' : 'text-gray-800 dark:text-gray-100'}`}>{value || '---'}</p>
     </div>
 );
 
@@ -60,7 +60,7 @@ export default function StudentDetailModal({ student, onClose }) {
                     {/* Top Profile Cluster */}
                     <section className="flex flex-col md:flex-row gap-10 items-start">
                         <div className="relative">
-                            <div className="w-40 h-40 rounded-[2.5rem] bg-gray-50 dark:bg-gray-900 border-4 border-white dark:border-gray-800 shadow-2xl overflow-hidden relative group print:w-32 print:h-32">
+                            <div className="w-40 h-40 rounded-[2.5rem] bg-gray-50 dark:bg-gray-900 border-4 border-white dark:border-gray-700 shadow-2xl overflow-hidden relative group print:w-32 print:h-32">
                                 <img src={photoUrl} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt="Identity" />
                             </div>
                             <div className="absolute -bottom-4 -right-4 bg-primary-600 text-white p-2.5 rounded-xl shadow-xl animate-float print:hidden"><ShieldCheck size={18} /></div>
@@ -201,11 +201,11 @@ export default function StudentDetailModal({ student, onClose }) {
                                 <CreditCard size={24} className="text-primary-400 print:text-primary-600" />
                                 <h3 className="text-xl font-black uppercase tracking-tighter">11. Financial Ledger Matrix</h3>
                             </div>
-                            <InfoBit label="Pattern" value={student.paymentPattern} />
-                            <InfoBit label="Cycle 1 (Y1)" value={`₹${student.yearFees?.y1?.toLocaleString()}`} />
-                            <InfoBit label="Cycle 2 (Y2)" value={`₹${student.yearFees?.y2?.toLocaleString()}`} />
-                            <InfoBit label="Cycle 3 (Y3)" value={`₹${student.yearFees?.y3?.toLocaleString()}`} />
-                            <InfoBit label="Campus (Bus/Hostel)" value={`₹${student.yearFees?.hostelBus?.toLocaleString()}`} />
+                            <InfoBit label="Pattern" value={student.paymentPattern} dark />
+                            <InfoBit label="Cycle 1 (Y1)" value={`₹${student.yearFees?.y1?.toLocaleString()}`} dark />
+                            <InfoBit label="Cycle 2 (Y2)" value={`₹${student.yearFees?.y2?.toLocaleString()}`} dark />
+                            <InfoBit label="Cycle 3 (Y3)" value={`₹${student.yearFees?.y3?.toLocaleString()}`} dark />
+                            <InfoBit label="Campus (Bus/Hostel)" value={`₹${student.yearFees?.hostelBus?.toLocaleString()}`} dark />
                         </div>
                     </section>
                 </div>

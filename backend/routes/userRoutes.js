@@ -1,6 +1,6 @@
 
 import express from 'express';
-import { getPendingUsers, approveUser, denyUser, changeUserPassword } from '../controllers/userController.js';
+import { getPendingUsers, approveUser, denyUser, changeUserPassword, updateUserRole } from '../controllers/userController.js';
 import { protect, admin } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -13,6 +13,7 @@ router.use(protect, admin);
 
 router.get('/pending', getPendingUsers);
 router.put('/:id/approve', approveUser);
+router.put('/:id/role', updateUserRole);
 router.delete('/:id/deny', denyUser);
 
 export default router;

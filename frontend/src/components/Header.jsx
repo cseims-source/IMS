@@ -110,7 +110,7 @@ export default function Header({ setSidebarOpen }) {
       </div>
 
       <div className="flex items-center gap-6">
-        <button onClick={toggleTheme} className="p-3 rounded-2xl text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all active:scale-90 hover:rotate-12">
+        <button onClick={toggleTheme} className="p-3 rounded-2xl text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all active:scale-90 hover:rotate-12" title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>
           {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
         </button>
 

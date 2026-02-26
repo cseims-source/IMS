@@ -18,7 +18,7 @@ export default function AdmissionInquiry() {
     const [step, setStep] = useState(1);
     const [formData, setFormData] = useState({
         name: '', mobile: '', email: '', gender: '', dob: '',
-        course: '', branch: '', state: '', city: '', address: '',
+        course: '', branch: '', academicYear: '', state: '', city: '', address: '',
         education10th: { board: '', schoolName: '', percentage: '' },
         lastExam: { examType: '', instituteName: '', percentage: '' },
         parentName: '', parentPhone: '', captcha: ''
@@ -200,6 +200,10 @@ export default function AdmissionInquiry() {
                                             </select>
                                         </div>
                                         <div>
+                                            <label className="block text-[0.6rem] font-black uppercase tracking-widest text-gray-400 mb-2 ml-1">Academic Year</label>
+                                            <input type="text" name="academicYear" value={formData.academicYear} onChange={handleChange} className="w-full p-4 bg-gray-50 dark:bg-gray-800 border-0 rounded-2xl focus:ring-4 focus:ring-primary-500/10 font-bold text-sm shadow-inner" placeholder="2025-26" />
+                                        </div>
+                                        <div>
                                             <label className="block text-[0.6rem] font-black uppercase tracking-widest text-gray-400 mb-2 ml-1">10th Percentage</label>
                                             <input type="number" name="education10th.percentage" value={formData.education10th.percentage} onChange={handleChange} className="w-full p-4 bg-gray-50 dark:bg-gray-800 border-0 rounded-2xl focus:ring-4 focus:ring-primary-500/10 font-bold text-sm shadow-inner" placeholder="00.00" />
                                         </div>
@@ -251,7 +255,7 @@ export default function AdmissionInquiry() {
                                             <div className="flex justify-between border-b dark:border-gray-700 pb-2"><span className="text-gray-400 font-bold">Node</span><span className="font-black text-gray-900 dark:text-white uppercase">{formData.name}</span></div>
                                             <div className="flex justify-between border-b dark:border-gray-700 pb-2"><span className="text-gray-400 font-bold">Protocol</span><span className="font-black text-gray-900 dark:text-white">{formData.course} - {formData.branch}</span></div>
                                             <div className="flex justify-between border-b dark:border-gray-700 pb-2"><span className="text-gray-400 font-bold">Spatial</span><span className="font-black text-gray-900 dark:text-white uppercase">{formData.city}, {formData.state}</span></div>
-                                            <div className="flex justify-between border-b dark:border-gray-700 pb-2"><span className="text-gray-400 font-bold">Cycle</span><span className="font-black text-gray-900 dark:text-white">2025-2026</span></div>
+                                            <div className="flex justify-between border-b dark:border-gray-700 pb-2"><span className="text-gray-400 font-bold">Cycle</span><span className="font-black text-gray-900 dark:text-white">{formData.academicYear || '—'}</span></div>
                                         </div>
                                     </div>
 

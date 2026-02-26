@@ -11,7 +11,9 @@ import StudentManager from './pages/StudentAdmission/StudentManager.jsx';
 import FacultyManager from './pages/Faculty/FacultyManager.jsx';
 import StreamManager from './pages/Streams/StreamManager.jsx';
 import AttendanceTracker from './pages/Attendance/AttendanceTracker.jsx';
+import StudentAttendanceAnalytics from './pages/Attendance/StudentAttendanceAnalytics.jsx';
 import MarksheetEntry from './pages/Marksheets/MarksheetEntry.jsx';
+import ExamScheduler from './pages/Exams/ExamScheduler.jsx';
 import TimetableViewer from './pages/Timetable/TimetableViewer.jsx';
 import HostelManagement from './pages/Hostel/HostelManagement.jsx';
 import NoticeBoard from './pages/NoticeBoard/NoticeBoard.jsx';
@@ -98,13 +100,15 @@ function App() {
                 <Route path="library" element={<PrivateRoute roles={['Admin', 'Student']}><Library /></PrivateRoute>} />
                 <Route path="reports" element={<PrivateRoute roles={['Admin']}><ReportGenerator /></PrivateRoute>} />
                 <Route path="calendar" element={<PrivateRoute roles={['Admin', 'Student']}><EventCalendar /></PrivateRoute>} />
-                <Route path="transport" element={<PrivateRoute roles={['Admin']}><TransportManagement/></PrivateRoute>} />
+                <Route path="transport" element={<PrivateRoute roles={['Admin', 'Student']}><TransportManagement/></PrivateRoute>} />
                 <Route path="fees" element={<PrivateRoute roles={['Admin']}><FeesManagement /></PrivateRoute>} />
                 <Route path="question-bank" element={<PrivateRoute roles={['Admin', 'Teacher', 'Student']}><QuestionBank /></PrivateRoute>} />
 
                 <Route path="faculty" element={<PrivateRoute roles={['Admin', 'Teacher']}><FacultyManager /></PrivateRoute>} />
                 <Route path="attendance" element={<PrivateRoute roles={['Admin', 'Teacher']}><AttendanceTracker /></PrivateRoute>} />
+                <Route path="attendance-analytics" element={<PrivateRoute roles={['Student']}><StudentAttendanceAnalytics /></PrivateRoute>} />
                 <Route path="marksheet" element={<PrivateRoute roles={['Admin', 'Teacher', 'Student']}><MarksheetEntry /></PrivateRoute>} />
+                <Route path="exam-scheduler" element={<PrivateRoute roles={['Admin', 'Teacher']}><ExamScheduler /></PrivateRoute>} />
                 <Route path="timetable" element={<PrivateRoute roles={['Admin', 'Teacher', 'Student']}><TimetableViewer /></PrivateRoute>} />
                 <Route path="student/:id" element={<PrivateRoute roles={['Admin', 'Teacher']}><ViewStudentProfile /></PrivateRoute>} />
                 

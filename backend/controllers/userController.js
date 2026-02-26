@@ -22,6 +22,9 @@ const approveUser = async (req, res) => {
     try {
         const user = await User.findById(req.params.id);
         if (user) {
+            if (req.body?.role && req.body.role !== user.role) {
+                await updateUserRoleInternal(user, req.body.role);
+            }
             user.status = 'active';
             await user.save();
             res.json({ message: 'User approved successfully.' });
@@ -85,5 +88,52 @@ const changeUserPassword = async (req, res) => {
     }
 };
 
+const updateUserRoleInternal = async (user, newRole) => {
+    const role = newRole;
+    if (!['Admin', 'Teacher', 'Student'].includes(role)) {
+        throw new Error('Invalid role');
+    }
+    if (user.status !== 'pending') {
+        throw new Error('Role update only allowed for pending users.');
+    }
 
-export { getPendingUsers, approveUser, denyUser, changeUserPassword };
+    // If role changes, rebuild profile
+    if (user.profileId) {
+        if (user.role === 'Student') {
+            await Student.findByIdAndDelete(user.profileId);
+        } else if (user.role === 'Teacher') {
+            await Faculty.findByIdAndDelete(user.profileId);
+        }
+    }
+
+    let profileId = null;
+    if (role === 'Student') {
+        const nameParts = user.name.trim().split(/\s+/);
+        const firstName = nameParts[0];
+        const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+        const profile = await Student.create({ firstName, lastName, email: user.email });
+        profileId = profile._id;
+    } else if (role === 'Teacher') {
+        const profile = await Faculty.create({ name: user.name, email: user.email, subject: 'Not Assigned' });
+        profileId = profile._id;
+    }
+
+    user.role = role;
+    user.profileId = profileId;
+};
+
+const updateUserRole = async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id);
+        if (!user) return res.status(404).json({ message: 'User not found.' });
+
+        await updateUserRoleInternal(user, req.body.role);
+        await user.save();
+        res.json({ message: 'User role updated.' });
+    } catch (error) {
+        res.status(400).json({ message: error.message || 'Role update failed.' });
+    }
+};
+
+
+export { getPendingUsers, approveUser, denyUser, changeUserPassword, updateUserRole };

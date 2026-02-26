@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { Users, BookOpen, CalendarCheck, Percent, Clock, Eye, Edit, Sparkles, Loader2, AlertTriangle, FileText, Copy, Check } from 'lucide-react';
+import { Users, BookOpen, CalendarCheck, Percent, Clock, Eye, Edit, Sparkles, Loader2, AlertTriangle, FileText, Copy, Check, CalendarDays } from 'lucide-react';
 
 const StatCard = ({ title, value, icon, color }) => (
     <div className={`p-6 bg-white dark:bg-gray-800 rounded-xl shadow-lg border-l-4 ${color}`}>
@@ -341,6 +341,7 @@ export default function TeacherDashboard() {
                 <div className="grid grid-cols-1 gap-4">
                     <QuickLink to="/app/attendance" text="Mark Attendance" icon={<CalendarCheck size={20}/>} />
                     <QuickLink to="/app/marksheet" text="Update Marks" icon={<Percent size={20}/>} />
+                    <QuickLink to="/app/exam-scheduler" text="Schedule Exam" icon={<CalendarDays size={20}/>} />
                     <QuickLink to="/app/notice-board" text="Post Notice" icon={<FileText size={20}/>} />
                 </div>
             </div>

@@ -24,18 +24,29 @@ const getDateFilter = (dateRangeQuery) => {
 // @access  Admin
 export const getAttendanceReport = async (req, res) => {
     try {
-        const { stream: streamName, dateRange } = req.query;
-        const studentFilter = streamName !== 'all' ? { stream: streamName } : {};
+        const { stream: streamName, streamId, dateRange, academicYear, semester, section, subject } = req.query;
+        const studentFilter = streamId
+            ? { streamId }
+            : (streamName && streamName !== 'all' ? { stream: streamName } : {});
         const dateFilter = getDateFilter(dateRange);
 
         const students = await Student.find(studentFilter);
         const studentIds = students.map(s => s._id);
 
+        const attendanceFilter = {
+            student: { $in: studentIds },
+            ...dateFilter
+        };
+        if (academicYear && academicYear !== 'all') attendanceFilter.academicYear = academicYear;
+        if (semester && semester !== 'all') attendanceFilter.semester = parseInt(semester);
+        if (section && section !== 'all') attendanceFilter.section = section;
+        if (subject && subject !== 'all') attendanceFilter.subject = subject;
+
         const attendanceData = await Attendance.aggregate([
-            { $match: { student: { $in: studentIds }, ...dateFilter } },
+            { $match: attendanceFilter },
             { $group: {
                 _id: '$student',
-                presentDays: { $sum: { $cond: [{ $eq: ['$status', 'present'] }, 1, 0] } },
+                presentDays: { $sum: { $cond: [{ $in: ['$status', ['present', 'late']] }, 1, 0] } },
                 totalDays: { $sum: 1 }
             }},
             { $project: {
@@ -47,13 +58,15 @@ export const getAttendanceReport = async (req, res) => {
             .filter(item => item.attendancePercentage < 75)
             .map(item => {
                 const student = students.find(s => s._id.equals(item._id));
+                if (!student) return null;
                 return {
                     studentId: item._id,
                     studentName: `${student.firstName} ${student.lastName}`,
                     stream: student.stream,
                     attendancePercentage: item.attendancePercentage.toFixed(2)
                 };
-            });
+            })
+            .filter(Boolean);
 
         res.json(defaulters);
     } catch (error) {
@@ -66,8 +79,13 @@ export const getAttendanceReport = async (req, res) => {
 // @access  Admin
 export const getFeesReport = async (req, res) => {
     try {
-        const { stream: streamName } = req.query;
-        const studentFilter = streamName !== 'all' ? { stream: streamName, 'fees.status': 'Pending' } : { 'fees.status': 'Pending' };
+        const { stream: streamName, streamId, academicYear, semester, section } = req.query;
+        const studentFilter = streamId
+            ? { streamId, 'fees.status': 'Pending' }
+            : (streamName && streamName !== 'all' ? { stream: streamName, 'fees.status': 'Pending' } : { 'fees.status': 'Pending' });
+        if (academicYear && academicYear !== 'all') studentFilter.academicYear = academicYear;
+        if (semester && semester !== 'all') studentFilter.currentSemester = parseInt(semester);
+        if (section && section !== 'all') studentFilter.section = section;
 
         const studentsWithPendingFees = await Student.find(studentFilter);
         
@@ -96,14 +114,22 @@ export const getFeesReport = async (req, res) => {
 // @access  Admin
 export const getAcademicReport = async (req, res) => {
     try {
-        const { stream: streamName } = req.query;
-        const studentFilter = streamName !== 'all' ? { stream: streamName } : {};
+        const { stream: streamName, streamId, academicYear, semester, section, subject } = req.query;
+        const studentFilter = streamId
+            ? { streamId }
+            : (streamName && streamName !== 'all' ? { stream: streamName } : {});
 
         const students = await Student.find(studentFilter);
         const studentIds = students.map(s => s._id);
 
+        const marksheetMatch = { student: { $in: studentIds } };
+        if (academicYear && academicYear !== 'all') marksheetMatch.academicYear = academicYear;
+        if (semester && semester !== 'all') marksheetMatch.semester = parseInt(semester);
+        if (section && section !== 'all') marksheetMatch.section = section;
+        if (subject && subject !== 'all') marksheetMatch['marks.subjectName'] = subject;
+
         const academicData = await Marksheet.aggregate([
-            { $match: { student: { $in: studentIds } } },
+            { $match: marksheetMatch },
             { $group: {
                 _id: '$student',
                 averageGrade: { $avg: '$percentage' },
@@ -149,13 +175,14 @@ export const getAiInsights = async (req, res) => {
         const attendance = await Attendance.find({}).select('status').lean();
         
         const totalAttendanceRecords = attendance.length;
-        const presentCount = attendance.filter(a => a.status === 'present').length;
+        const presentCount = attendance.filter(a => a.status === 'present' || a.status === 'late').length;
 
         const dataSummary = {
             totalStudents: students.length,
             totalStreams: streams.length,
             studentsPerStream: students.reduce((acc, s) => {
-                acc[s.stream] = (acc[s.stream] || 0) + 1;
+                const streamName = s.stream || 'Unknown';
+                acc[streamName] = (acc[streamName] || 0) + 1;
                 return acc;
             }, {}),
             academic: {
@@ -169,10 +196,13 @@ export const getAiInsights = async (req, res) => {
                 overallPercentage: totalAttendanceRecords > 0 ? ((presentCount / totalAttendanceRecords) * 100).toFixed(2) + '%' : 'N/A',
             },
             fees: {
-                statusCounts: students.flatMap(s => s.fees).reduce((acc, f) => {
-                    acc[f.status] = (acc[f.status] || 0) + 1;
-                    return acc;
-                }, {})
+                statusCounts: students
+                    .flatMap(s => s.fees || [])
+                    .reduce((acc, f) => {
+                        const status = f?.status || 'Unknown';
+                        acc[status] = (acc[status] || 0) + 1;
+                        return acc;
+                    }, {})
             }
         };
         

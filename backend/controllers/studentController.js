@@ -3,7 +3,17 @@ import Faculty from '../models/facultyModel.js';
 import Marksheet from '../models/marksheetModel.js';
 import AdmissionInquiry from '../models/admissionInquiryModel.js';
 import User from '../models/userModel.js';
+import Stream from '../models/streamModel.js';
 import { GoogleGenAI } from '@google/genai';
+import XLSX from 'xlsx';
+import mongoose from 'mongoose';
+
+const resolveStreamId = async (payload) => {
+    const streamName = payload.stream || payload.branch;
+    if (!streamName) return null;
+    const stream = await Stream.findOne({ name: streamName }).select('_id').lean();
+    return stream?._id || null;
+};
 
 const getStudents = async (req, res) => {
     try {
@@ -16,7 +26,16 @@ const getStudents = async (req, res) => {
             if (!teacher) {
                 return res.status(404).json({ message: 'Teacher profile not found.' });
             }
-            const students = await Student.find({ stream: { $in: teacher.assignedStreams } }).sort({ createdAt: -1 });
+            const assignedStreamIds = teacher.assignedStreamIds?.length
+                ? teacher.assignedStreamIds
+                : [...new Set((teacher.workload || []).map(w => w.streamId).filter(Boolean))];
+            const assignedStreams = [...new Set((teacher.workload || []).map(w => w.stream).filter(Boolean))];
+            const query = assignedStreamIds.length > 0
+                ? { streamId: { $in: assignedStreamIds } }
+                : { stream: { $in: assignedStreams } };
+            const students = assignedStreams.length || assignedStreamIds.length
+                ? await Student.find(query).sort({ createdAt: -1 })
+                : [];
             return res.json(students);
         }
         res.json([]);
@@ -53,13 +72,14 @@ const addStudent = async (req, res) => {
             return res.status(400).json({ message: 'Identity Node already exists with this email.' });
         }
 
+        const streamId = await resolveStreamId(req.body);
         const student = new Student({ 
             ...req.body,
-            email 
+            email,
+            ...(streamId ? { streamId } : {})
         });
         const createdStudent = await student.save();
 
-        // LOGIC BRIDGE: Map Registry 'Pending' to Inquiry Hub 'New'
         if (req.body.status === 'Pending') {
             try {
                 await AdmissionInquiry.create({
@@ -72,7 +92,7 @@ const addStudent = async (req, res) => {
                     state: req.body.presentAddress?.state || 'Odisha',
                     city: req.body.presentAddress?.city || 'Bhubaneswar',
                     address: req.body.presentAddress?.address || 'Registry Entry',
-                    status: 'New', // Default status for Inquiries
+                    status: 'New',
                     gender: req.body.gender,
                     dob: req.body.dob,
                     notes: 'Auto-generated from Manual Student Registry'
@@ -95,6 +115,8 @@ const updateStudent = async (req, res) => {
         if (student) {
             Object.assign(student, req.body);
             if (req.body.email) student.email = req.body.email.toLowerCase();
+            const streamId = await resolveStreamId(req.body);
+            if (streamId) student.streamId = streamId;
             const updatedStudent = await student.save();
             res.json(updatedStudent);
         } else {
@@ -176,18 +198,27 @@ const importStudents = async (req, res) => {
 const getStudentsByStream = async (req, res) => {
     try {
         const { streamName } = req.params;
-        const { semester } = req.query;
-        const query = { stream: { $regex: streamName, $options: 'i' } };
+        const { semester, section } = req.query;
+        const query = mongoose.Types.ObjectId.isValid(streamName)
+            ? { streamId: streamName }
+            : { stream: { $regex: streamName, $options: 'i' } };
         if (semester) query.currentSemester = parseInt(semester);
+        if (section) query.section = section;
 
         if (req.user.role === 'Teacher') {
             const teacher = await Faculty.findById(req.user.profileId);
-            if (!teacher.assignedStreams.some(s => s.toLowerCase().includes(streamName.toLowerCase()))) {
-                return res.status(403).json({ message: "Access Denied: Node not assigned to your Faculty profile." });
+            const canAccess = teacher.workload.some(work => 
+                work.stream.toLowerCase().includes(streamName.toLowerCase()) &&
+                (!semester || work.semester === parseInt(semester)) &&
+                (!section || work.section === section)
+            );
+            
+            if (!canAccess) {
+                return res.status(403).json({ message: "Access Denied: Node not assigned to your Faculty workload." });
             }
         }
 
-        const students = await Student.find(query).sort({ firstName: 1 });
+        const students = await Student.find(query).sort({ registrationNumber: 1 });
         res.json(students);
     } catch (error) { 
         res.status(500).json({ message: 'Server Error during student lookup' }); 
@@ -275,9 +306,124 @@ const getAcademicAdvice = async (req, res) => {
     } catch (error) { res.status(500).json({ message: 'AI Error' }); }
 };
 
+const getFeesStats = async (req, res) => {
+    try {
+        const { stream, streamId } = req.query;
+        const studentFilter = streamId
+            ? { streamId }
+            : (stream && stream !== 'all' ? { stream } : {});
+
+        const students = await Student.find(studentFilter).select('fees').lean();
+        const allFees = students.flatMap(s => s.fees || []);
+
+        const total = allFees.length;
+        const pending = allFees.filter(f => f.status === 'Pending');
+        const paid = allFees.filter(f => f.status === 'Paid');
+        const pendingAmount = pending.reduce((sum, f) => sum + (f.amount || 0), 0);
+        const paidAmount = paid.reduce((sum, f) => sum + (f.amount || 0), 0);
+        const today = new Date();
+        const overdue = pending.filter(f => f.dueDate && new Date(f.dueDate) < today).length;
+
+        res.json({ total, pending: pending.length, paid: paid.length, pendingAmount, paidAmount, overdue });
+    } catch (error) {
+        res.status(500).json({ message: 'Fee stats failed.' });
+    }
+};
+
+const exportFees = async (req, res) => {
+    try {
+        const { status, stream, streamId } = req.query;
+        const studentFilter = streamId
+            ? { streamId }
+            : (stream && stream !== 'all' ? { stream } : {});
+
+        const students = await Student.find(studentFilter).lean();
+        const rows = [];
+        students.forEach(s => {
+            (s.fees || []).forEach(f => {
+                if (status && status !== 'All' && f.status !== status) return;
+                rows.push({
+                    studentId: s._id,
+                    studentName: `${s.firstName} ${s.lastName}`.trim(),
+                    email: s.email,
+                    stream: s.stream,
+                    feeType: f.type,
+                    amount: f.amount,
+                    dueDate: f.dueDate,
+                    status: f.status
+                });
+            });
+        });
+        const worksheet = XLSX.utils.json_to_sheet(rows);
+        const csv = XLSX.utils.sheet_to_csv(worksheet);
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', 'attachment; filename="fees.csv"');
+        res.status(200).send(csv);
+    } catch (error) {
+        res.status(500).json({ message: 'Export failed.' });
+    }
+};
+
+const importFees = async (req, res) => {
+    try {
+        if (!req.file?.buffer) {
+            return res.status(400).json({ message: 'No file uploaded.' });
+        }
+        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+        const errors = [];
+        let imported = 0;
+
+        for (const [index, row] of rows.entries()) {
+            const rowIndex = index + 2;
+            const studentId = row.studentId || row.student_id || '';
+            const registrationNumber = row.registrationNumber || row.registration_no || '';
+            const email = (row.email || row.Email || '').toString().toLowerCase();
+            const type = row.type || row.feeType || row.FeeType;
+            const amount = Number(row.amount || row.Amount || 0);
+            const dueDate = row.dueDate || row.DueDate || '';
+            const status = row.status || row.Status || 'Pending';
+
+            if (!type || !amount || !dueDate) {
+                errors.push({ row: rowIndex, reason: 'Missing fee fields.' });
+                continue;
+            }
+
+            let student = null;
+            if (studentId && mongoose.Types.ObjectId.isValid(studentId)) {
+                student = await Student.findById(studentId);
+            } else if (registrationNumber) {
+                student = await Student.findOne({ registrationNumber });
+            } else if (email) {
+                student = await Student.findOne({ email });
+            }
+            if (!student) {
+                errors.push({ row: rowIndex, reason: 'Student not found.' });
+                continue;
+            }
+
+            student.fees.push({
+                type,
+                amount,
+                dueDate: new Date(dueDate),
+                status: status === 'Paid' ? 'Paid' : 'Pending'
+            });
+            await student.save();
+            imported += 1;
+        }
+
+        res.status(201).json({ imported, errorCount: errors.length, errors });
+    } catch (error) {
+        res.status(400).json({ message: 'Import failed.', error: error.message });
+    }
+};
+
 export { 
     getStudents, getStudentStats, getStudentsByStream, addStudent, updateStudent, deleteStudent, bulkDeleteStudents,
     getStudentProfile, getStudentByIdForView, updateStudentProfilePhoto, importStudents,
     getStudentFees, addStudentFee, updateFeeStatus, getMyFees, payMyFee,
-    getAcademicAdvice
+    getAcademicAdvice,
+    getFeesStats, exportFees, importFees
 };

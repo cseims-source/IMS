@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, ChevronDown, Book, FileText } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNotification } from '../../contexts/NotificationContext';
+import { handleExportWithNotification } from '../../utils/exportUtils';
 
 const CourseForm = ({ course, onSave, onCancel }) => {
     const [formData, setFormData] = useState(course ? { name: course.name, duration: course.duration, credits: course.credits, description: course.description } : { name: '', duration: '', credits: '', description: '' });
@@ -72,7 +74,9 @@ export default function CourseManager() {
   const [isSubjectFormOpen, setIsSubjectFormOpen] = useState(false);
   const [editingSubject, setEditingSubject] = useState(null);
   const [currentCourseId, setCurrentCourseId] = useState(null);
-  const { api } = useAuth();
+  const { api, user } = useAuth();
+  const { addToast } = useNotification();
+  const isAdmin = user?.role === 'Admin';
 
   useEffect(() => {
     fetchCourses();
@@ -159,9 +163,14 @@ export default function CourseManager() {
     <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100">Course & Subject Manager</h1>
-        <button onClick={handleAddCourse} className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
-          <Plus size={20} className="mr-2" /> Add Course
-        </button>
+        {isAdmin && (
+            <div className="flex gap-2">
+                <button onClick={() => handleExportWithNotification(addToast, '/api/courses/export', 'courses-data', {}, 'csv')} className="px-4 py-2 bg-gray-900 text-white rounded-lg">Export</button>
+                <button onClick={handleAddCourse} className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                    <Plus size={20} className="mr-2" /> Add Course
+                </button>
+            </div>
+        )}
       </div>
       
       <div className="space-y-4">
@@ -175,13 +184,15 @@ export default function CourseManager() {
                   <p className="text-sm text-gray-500">{course.duration} &middot; {course.credits} Credits</p>
                 </div>
               </div>
-              <div className="flex items-center gap-4">
-                 <div className="flex items-center gap-2">
-                    <button onClick={(e) => { e.stopPropagation(); handleEditCourse(course); }} className="p-2 text-blue-600 hover:bg-blue-100 rounded-full"><Edit size={16}/></button>
-                    <button onClick={(e) => { e.stopPropagation(); handleDeleteCourse(course._id); }} className="p-2 text-red-600 hover:bg-red-100 rounded-full"><Trash2 size={16}/></button>
-                 </div>
-                 <ChevronDown className={`transition-transform ${openCourseId === course._id ? 'rotate-180' : ''}`} />
-              </div>
+                <div className="flex items-center gap-4">
+                  {isAdmin && (
+                    <div className="flex items-center gap-2">
+                      <button onClick={(e) => { e.stopPropagation(); handleEditCourse(course); }} className="p-2 text-blue-600 hover:bg-blue-100 rounded-full"><Edit size={16}/></button>
+                      <button onClick={(e) => { e.stopPropagation(); handleDeleteCourse(course._id); }} className="p-2 text-red-600 hover:bg-red-100 rounded-full"><Trash2 size={16}/></button>
+                    </div>
+                  )}
+                  <ChevronDown className={`transition-transform ${openCourseId === course._id ? 'rotate-180' : ''}`} />
+                </div>
             </div>
             {openCourseId === course._id && (
               <div className="p-4 border-t dark:border-gray-600">
@@ -194,15 +205,19 @@ export default function CourseManager() {
                                 <FileText size={16} className="mr-3 text-gray-500" />
                                 <span>{subject.code} - {subject.name} ({subject.credits} credits)</span>
                             </div>
+                         {isAdmin && (
                             <div className="flex gap-2">
-                                <button onClick={() => handleEditSubject(subject, course._id)} className="p-1 text-blue-600 hover:bg-blue-100 rounded-full"><Edit size={14}/></button>
-                                <button onClick={() => handleDeleteSubject(subject._id, course._id)} className="p-1 text-red-600 hover:bg-red-100 rounded-full"><Trash2 size={14}/></button>
+                              <button onClick={() => handleEditSubject(subject, course._id)} className="p-1 text-blue-600 hover:bg-blue-100 rounded-full"><Edit size={14}/></button>
+                              <button onClick={() => handleDeleteSubject(subject._id, course._id)} className="p-1 text-red-600 hover:bg-red-100 rounded-full"><Trash2 size={14}/></button>
                             </div>
+                         )}
                         </li>
                     ))}
                     {course.subjects.length === 0 && <p className="text-sm text-gray-500">No subjects added yet.</p>}
                  </ul>
-                 <button onClick={() => handleAddSubject(course._id)} className="text-sm text-blue-600 mt-3 flex items-center"><Plus size={16} className="mr-1"/> Add Subject</button>
+                  {isAdmin && (
+                    <button onClick={() => handleAddSubject(course._id)} className="text-sm text-blue-600 mt-3 flex items-center"><Plus size={16} className="mr-1"/> Add Subject</button>
+                  )}
               </div>
             )}
           </div>

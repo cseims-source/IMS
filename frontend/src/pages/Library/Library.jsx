@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNotification } from '../../contexts/NotificationContext';
 import { Search, BookUp, BookDown, User, Plus, Edit, Trash2, History, ArrowUp, ArrowDown } from 'lucide-react';
 import { formatDate, formatDateTime } from '../../utils/dateFormatter';
+import { handleExportWithNotification } from '../../utils/exportUtils';
 import ConfirmationModal from '../../components/ConfirmationModal';
 
 const BookForm = ({ book, onSave, onCancel }) => {
@@ -131,9 +133,12 @@ const TransactionHistoryTab = ({ transactions, books, users }) => {
 export default function Library() {
   const [activeTab, setActiveTab] = useState('books');
   const { user, api } = useAuth();
+  const { addToast } = useNotification();
   const [books, setBooks] = useState([]);
   const [issued, setIssued] = useState([]);
   const [transactions, setTransactions] = useState([]);
+    const [myIssued, setMyIssued] = useState([]);
+    const [myTransactions, setMyTransactions] = useState([]);
   const [users, setUsers] = useState([]);
   const [isBookFormOpen, setIsBookFormOpen] = useState(false);
   const [isIssueFormOpen, setIsIssueFormOpen] = useState(false);
@@ -142,21 +147,37 @@ export default function Library() {
   const [sortConfig, setSortConfig] = useState({ key: 'dueDate', direction: 'ascending' });
   const [bookFilter, setBookFilter] = useState('');
   const [studentFilter, setStudentFilter] = useState('');
+    const [searchBooks, setSearchBooks] = useState('');
+    const [filterStatus, setFilterStatus] = useState('all');
+    const [filterCategory, setFilterCategory] = useState('all');
+        const [importFile, setImportFile] = useState(null);
 
   const isAdmin = user?.role === 'Admin';
 
   useEffect(() => {
-    fetchBooks();
-    if (isAdmin) {
-        fetchIssuedBooks();
-        fetchTransactions();
-        api('/api/students').then(data => setUsers(data.map(d => ({...d, role: 'Student'}))));
-    }
-  }, [api, isAdmin]);
+        fetchBooks();
+        if (isAdmin) {
+                fetchIssuedBooks();
+                fetchTransactions();
+                api('/api/students').then(data => setUsers(data.map(d => ({...d, role: 'Student'}))));
+        } else {
+                fetchMyIssued();
+                fetchMyTransactions();
+        }
+    }, [api, isAdmin]);
 
-  const fetchBooks = async () => setBooks(await api('/api/library/books'));
-  const fetchIssuedBooks = async () => setIssued(await api('/api/library/transactions/issued'));
-  const fetchTransactions = async () => setTransactions(await api('/api/library/transactions/all'));
+    const fetchBooks = async () => {
+        const params = new URLSearchParams({
+                search: searchBooks,
+                status: filterStatus,
+                category: filterCategory
+        });
+        setBooks(await api(`/api/library/books?${params.toString()}`));
+    };
+    const fetchIssuedBooks = async () => setIssued(await api('/api/library/transactions/issued'));
+    const fetchTransactions = async () => setTransactions(await api('/api/library/transactions/all'));
+    const fetchMyIssued = async () => setMyIssued(await api('/api/library/transactions/my-issued'));
+    const fetchMyTransactions = async () => setMyTransactions(await api('/api/library/transactions/my'));
 
   const handleSaveBook = async (bookData) => {
     const url = editingBook ? `/api/library/books/${editingBook._id}` : '/api/library/books';
@@ -184,10 +205,19 @@ export default function Library() {
     });
   };
 
+    const handleImportBooks = async () => {
+        if (!importFile) return alert('Select a file first.');
+        const formData = new FormData();
+        formData.append('file', importFile);
+        await api('/api/library/books/import', { method: 'POST', body: formData });
+        setImportFile(null);
+        fetchBooks();
+    };
+
   const handleIssueBook = async (issueData) => {
     await api('/api/library/transactions/issue', { method: 'POST', body: JSON.stringify(issueData) });
     setIsIssueFormOpen(false);
-    fetchBooks();
+        fetchBooks();
     fetchIssuedBooks();
     fetchTransactions();
   };
@@ -203,6 +233,8 @@ export default function Library() {
             fetchBooks();
             fetchIssuedBooks();
             fetchTransactions();
+                        fetchMyIssued();
+                        fetchMyTransactions();
             setConfirmAction(null);
         }
     });
@@ -258,23 +290,55 @@ export default function Library() {
     <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg">
       <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100 mb-6">Library Hub</h1>
       
-      {isAdmin && (
-        <div className="border-b border-gray-200 dark:border-gray-700 mb-6">
-            <nav className="-mb-px flex space-x-4" aria-label="Tabs">
-                <TabButton active={activeTab === 'books'} onClick={() => setActiveTab('books')}>All Books</TabButton>
-                <TabButton active={activeTab === 'issued'} onClick={() => setActiveTab('issued')}>Issued Books</TabButton>
-                <TabButton active={activeTab === 'history'} onClick={() => setActiveTab('history')}>Transaction History</TabButton>
-            </nav>
-        </div>
-      )}
+            <div className="border-b border-gray-200 dark:border-gray-700 mb-6">
+                    <nav className="-mb-px flex space-x-4" aria-label="Tabs">
+                            <TabButton active={activeTab === 'books'} onClick={() => setActiveTab('books')}>All Books</TabButton>
+                            {isAdmin ? (
+                                <>
+                                    <TabButton active={activeTab === 'issued'} onClick={() => setActiveTab('issued')}>Issued Books</TabButton>
+                                    <TabButton active={activeTab === 'history'} onClick={() => setActiveTab('history')}>Transaction History</TabButton>
+                                </>
+                            ) : (
+                                <>
+                                    <TabButton active={activeTab === 'my-issued'} onClick={() => setActiveTab('my-issued')}>My Issued</TabButton>
+                                    <TabButton active={activeTab === 'my-history'} onClick={() => setActiveTab('my-history')}>My History</TabButton>
+                                </>
+                            )}
+                    </nav>
+            </div>
 
       <div className="mt-6">
         {activeTab === 'books' && (
             <div>
-                <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-semibold">Book Collection</h2>
-                    {isAdmin && <button onClick={() => { setEditingBook(null); setIsBookFormOpen(true); }} className="flex items-center text-sm px-3 py-1.5 bg-primary-600 text-white rounded-md"><Plus size={16} className="mr-1" />Add Book</button>}
-                </div>
+                                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+                                    <h2 className="text-xl font-semibold">Book Collection</h2>
+                                    {isAdmin && (
+                                        <div className="flex flex-wrap gap-2">
+                                            <label className="px-3 py-1.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md text-sm cursor-pointer">
+                                                <input type="file" accept=".csv,.xlsx" className="hidden" onChange={(e) => setImportFile(e.target.files?.[0] || null)} />
+                                                {importFile ? importFile.name : 'Import CSV/XLSX'}
+                                            </label>
+                                            <button onClick={handleImportBooks} className="flex items-center text-sm px-3 py-1.5 bg-emerald-600 text-white rounded-md"><ArrowUp size={16} className="mr-1" />Upload</button>
+                                            <button onClick={() => { setEditingBook(null); setIsBookFormOpen(true); }} className="flex items-center text-sm px-3 py-1.5 bg-primary-600 text-white rounded-md"><Plus size={16} className="mr-1" />Add Book</button>
+                                        </div>
+                                    )}
+                                </div>
+                                                {isAdmin && (
+                                                    <div className="flex gap-3 mb-4">
+                                                        <button onClick={() => handleExportWithNotification(addToast, '/api/library/books/export', 'library-books', {}, 'csv')} className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm font-semibold">Export Books</button>
+                                                        <button onClick={() => handleExportWithNotification(addToast, '/api/library/transactions/export', 'library-transactions', {}, 'csv')} className="px-4 py-2 bg-primary-600 text-white rounded-md text-sm font-semibold">Export Transactions</button>
+                                                    </div>
+                                                )}
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                                        <input value={searchBooks} onChange={(e) => setSearchBooks(e.target.value)} placeholder="Search by title, author, ISBN" className="w-full p-2 border rounded-md bg-white dark:bg-gray-800" />
+                                        <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="w-full p-2 border rounded-md bg-white dark:bg-gray-800">
+                                                <option value="all">All Status</option>
+                                                <option value="Available">Available</option>
+                                                <option value="Issued">Issued</option>
+                                        </select>
+                                        <input value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} placeholder="Category" className="w-full p-2 border rounded-md bg-white dark:bg-gray-800" />
+                                </div>
+                                <button onClick={fetchBooks} className="mb-6 px-4 py-2 bg-primary-600 text-white rounded-md text-sm font-semibold">Apply Filters</button>
                  <Table headers={['Title', 'Author', 'Status', ...(isAdmin ? ['Actions'] : [])]} data={books} renderRow={(book) => (
                     <tr key={book._id} className="border-b dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700/50">
                         <td className="p-3">{book.title}</td>
@@ -357,6 +421,21 @@ export default function Library() {
             </div>
         )}
         {isAdmin && activeTab === 'history' && <TransactionHistoryTab transactions={transactions} books={books} users={users} />}
+
+        {!isAdmin && activeTab === 'my-issued' && (
+            <div>
+                <h2 className="text-xl font-semibold mb-4">My Issued Books</h2>
+                <Table headers={['Book', 'Due Date']} data={myIssued} renderRow={(item) => (
+                    <tr key={item._id} className="border-b dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                        <td className="p-3">{item.book?.title}</td>
+                        <td className="p-3">{formatDate(item.dueDate)}</td>
+                    </tr>
+                )} />
+            </div>
+        )}
+        {!isAdmin && activeTab === 'my-history' && (
+            <TransactionHistoryTab transactions={myTransactions} books={books} users={users} />
+        )}
       </div>
       {isBookFormOpen && <BookForm book={editingBook} onSave={handleSaveBook} onCancel={() => setIsBookFormOpen(false)} />}
       {isIssueFormOpen && <IssueForm books={books} users={users} onSave={handleIssueBook} onCancel={() => setIsIssueFormOpen(false)} />}

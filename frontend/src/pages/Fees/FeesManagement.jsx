@@ -90,6 +90,8 @@ export default function FeesManagement() {
     const [actionLoading, setActionLoading] = useState(false);
     const [statusFilter, setStatusFilter] = useState('All');
     const [dateFilter, setDateFilter] = useState({ start: '', end: '' });
+    const [stats, setStats] = useState(null);
+    const [importFile, setImportFile] = useState(null);
 
     const searchResults = useMemo(() => {
         if (!searchTerm) return [];
@@ -175,11 +177,63 @@ export default function FeesManagement() {
         fetchAllStudents();
     }, [api]);
 
+    useEffect(() => {
+        const fetchStats = async () => {
+            try {
+                const data = await api('/api/students/fees/stats');
+                setStats(data);
+            } catch (error) {
+                setStats(null);
+            }
+        };
+        fetchStats();
+    }, [api]);
+
+    const handleExport = () => {
+        window.open('/api/students/fees/export', '_blank');
+    };
+
+    const handleImport = async () => {
+        if (!importFile) return addToast('Select a file first.', 'info');
+        const formData = new FormData();
+        formData.append('file', importFile);
+        await api('/api/students/fees/import', { method: 'POST', body: formData });
+        setImportFile(null);
+        addToast('Fees imported.', 'success');
+    };
+
     return (
         <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg">
             <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100 mb-6 flex items-center">
                 <DollarSign className="mr-3 text-primary-500" /> Fees Management
             </h1>
+
+            {stats && (
+                <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
+                    {[
+                        { label: 'Total', value: stats.total },
+                        { label: 'Pending', value: stats.pending },
+                        { label: 'Paid', value: stats.paid },
+                        { label: 'Overdue', value: stats.overdue },
+                        { label: 'Pending ₹', value: stats.pendingAmount },
+                        { label: 'Paid ₹', value: stats.paidAmount }
+                    ].map(item => (
+                        <div key={item.label} className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-xl text-center">
+                            <p className="text-[0.6rem] font-black uppercase text-gray-400">{item.label}</p>
+                            <p className="text-2xl font-black text-gray-900 dark:text-white">{item.value}</p>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            <div className="flex flex-wrap gap-3 mb-6 items-center">
+                <label className="px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md text-sm cursor-pointer">
+                    <input type="file" accept=".csv,.xlsx" className="hidden" onChange={(e) => setImportFile(e.target.files?.[0] || null)} />
+                    {importFile ? importFile.name : 'Import CSV/XLSX'}
+                </label>
+                <button onClick={handleImport} className="px-3 py-2 bg-emerald-600 text-white rounded-md text-sm">Upload</button>
+                <button onClick={handleExport} className="px-3 py-2 bg-gray-900 text-white rounded-md text-sm">Export CSV</button>
+            </div>
 
             <div className="max-w-xl mx-auto mb-8">
                 <label htmlFor="student-search" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Search for a Student</label>

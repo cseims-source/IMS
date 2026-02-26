@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { User, Mail, Phone, BookOpen, GraduationCap, BarChart2, CheckCircle, Calendar, DollarSign, ClipboardList, Clock, ArrowRight, Activity, Zap } from 'lucide-react';
+import { User, Mail, Phone, BookOpen, GraduationCap, BarChart2, CheckCircle, Calendar, DollarSign, ClipboardList, Clock, ArrowRight, Activity, Zap, Award } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { formatDate } from '../../utils/dateFormatter';
 import AcademicAdvisor from './AcademicAdvisor.jsx';
@@ -51,7 +51,7 @@ export default function StudentDashboard() {
   
   const attStats = useMemo(() => {
     if (!attendance.length) return { perc: 0, status: 'Registry Silence' };
-    const present = attendance.filter(a => a.status === 'present').length;
+        const present = attendance.filter(a => a.status === 'present' || a.status === 'late').length;
     const perc = ((present / attendance.length) * 100).toFixed(0);
     return { perc, status: perc >= 75 ? 'Optimal' : 'Flagged' };
   }, [attendance]);
@@ -73,8 +73,8 @@ export default function StudentDashboard() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {/* Participation Pulse Widget */}
-            <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] shadow-xl border border-gray-100 dark:border-gray-700 relative overflow-hidden group">
+                {/* Participation Pulse Widget */}
+                <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] shadow-xl border border-gray-100 dark:border-gray-700 relative overflow-hidden group">
                  <div className={`absolute top-0 right-0 w-32 h-32 blur-[60px] opacity-10 ${attStats.perc >= 75 ? 'bg-cyan-500' : 'bg-red-500'}`}></div>
                  <div className="flex justify-between items-start mb-6">
                      <div>
@@ -88,6 +88,9 @@ export default function StudentDashboard() {
                  <span className={`px-4 py-1.5 rounded-full text-[0.55rem] font-black uppercase tracking-widest shadow-sm ${attStats.perc >= 75 ? 'bg-cyan-50 text-cyan-600 border border-cyan-100' : 'bg-red-50 text-red-600 border border-red-100'}`}>
                     Logic: {attStats.status}
                  </span>
+                      <div className="mt-4">
+                          <Link to="/app/attendance-analytics" className="text-[0.6rem] font-black uppercase tracking-widest text-primary-600 hover:underline">View analytics</Link>
+                      </div>
             </div>
 
             {/* Today's Timetable Snippet */}
@@ -123,6 +126,26 @@ export default function StudentDashboard() {
 
             <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] shadow-xl border border-gray-100 dark:border-gray-700">
                 <div className="flex items-center justify-between mb-6">
+                    <p className="text-[0.6rem] font-black text-gray-400 uppercase tracking-widest">Recent Result</p>
+                    <Award size={18} className="text-primary-500" />
+                </div>
+                {summary?.recentMarksheet ? (
+                    <div className="space-y-3">
+                        <p className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-tight">{summary.recentMarksheet.exam}</p>
+                        <p className="text-[0.6rem] font-black uppercase tracking-widest text-gray-400">Sem {summary.recentMarksheet.semester}</p>
+                        <div className="flex items-center justify-between">
+                            <span className="text-2xl font-black text-primary-600 tracking-tighter">{summary.recentMarksheet.percentage}%</span>
+                            <span className="px-3 py-1 bg-primary-600 text-white rounded-lg text-xs font-black uppercase">{summary.recentMarksheet.grade}</span>
+                        </div>
+                        <Link to="/app/marksheet" className="text-[0.6rem] font-black uppercase tracking-widest text-primary-600 hover:underline">View all results</Link>
+                    </div>
+                ) : (
+                    <p className="text-[0.65rem] font-bold text-gray-400 uppercase tracking-[0.3em]">No published results yet</p>
+                )}
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] shadow-xl border border-gray-100 dark:border-gray-700">
+                <div className="flex items-center justify-between mb-6">
                     <p className="text-[0.6rem] font-black text-gray-400 uppercase tracking-widest">Registry Notices</p>
                     <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
                 </div>
@@ -134,6 +157,21 @@ export default function StudentDashboard() {
                         </div>
                     ))}
                     <Link to="/app/notice-board" className="mt-4 block text-[0.6rem] font-black text-primary-600 uppercase tracking-widest">View bulletin <ArrowRight size={12} className="inline ml-1"/></Link>
+                </div>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] shadow-xl border border-gray-100 dark:border-gray-700">
+                <div className="flex items-center justify-between mb-6">
+                    <p className="text-[0.6rem] font-black text-gray-400 uppercase tracking-widest">Quick Links</p>
+                    <div className="w-2 h-2 rounded-full bg-primary-500 animate-pulse"></div>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    <Link to="/app/library" className="px-3 py-2 bg-gray-50 dark:bg-gray-900 rounded-xl text-[0.55rem] font-black uppercase tracking-widest text-gray-600 dark:text-gray-300 text-center">Library</Link>
+                    <Link to="/app/transport" className="px-3 py-2 bg-gray-50 dark:bg-gray-900 rounded-xl text-[0.55rem] font-black uppercase tracking-widest text-gray-600 dark:text-gray-300 text-center">Transport</Link>
+                    <Link to="/app/marksheet" className="px-3 py-2 bg-gray-50 dark:bg-gray-900 rounded-xl text-[0.55rem] font-black uppercase tracking-widest text-gray-600 dark:text-gray-300 text-center">Results</Link>
+                    <Link to="/app/attendance-analytics" className="px-3 py-2 bg-gray-50 dark:bg-gray-900 rounded-xl text-[0.55rem] font-black uppercase tracking-widest text-gray-600 dark:text-gray-300 text-center">Attendance</Link>
+                    <Link to="/app/canteen" className="px-3 py-2 bg-gray-50 dark:bg-gray-900 rounded-xl text-[0.55rem] font-black uppercase tracking-widest text-gray-600 dark:text-gray-300 text-center">Canteen</Link>
+                    <Link to="/app/placements" className="px-3 py-2 bg-gray-50 dark:bg-gray-900 rounded-xl text-[0.55rem] font-black uppercase tracking-widest text-gray-600 dark:text-gray-300 text-center">Placements</Link>
                 </div>
             </div>
         </div>

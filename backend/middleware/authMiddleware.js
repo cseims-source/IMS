@@ -33,7 +33,8 @@ const protect = async (req, res, next) => {
 };
 
 const admin = (req, res, next) => {
-    if (req.user && req.user.role === 'Admin') {
+    const role = req.user?.role?.toLowerCase();
+    if (role === 'admin' || role === 'super admin' || role === 'superadmin') {
         next();
     } else {
         res.status(403).json({ message: 'Not authorized as an admin' });

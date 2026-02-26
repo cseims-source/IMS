@@ -24,8 +24,16 @@ const reportKeys = {
 export default function ReportGenerator() {
   const [reportType, setReportType] = useState('attendance');
   const [generatedReport, setGeneratedReport] = useState(null);
-  const [filters, setFilters] = useState({ stream: 'all', dateRange: 'all' });
+    const [filters, setFilters] = useState({
+            stream: 'all',
+            dateRange: 'all',
+            academicYear: 'all',
+            semester: 'all',
+            section: 'all',
+            subject: 'all'
+    });
   const [streams, setStreams] = useState([]);
+    const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const { api } = useAuth();
@@ -47,6 +55,18 @@ export default function ReportGenerator() {
         }
     };
     fetchStreams();
+  }, [api]);
+
+  useEffect(() => {
+    const fetchSubjects = async () => {
+        try {
+            const data = await api('/api/streams/all-subjects');
+            setSubjects(data.map(s => s.name));
+        } catch (error) {
+            setSubjects([]);
+        }
+    };
+    fetchSubjects();
   }, [api]);
 
   const handleFilterChange = (e) => {
@@ -149,6 +169,33 @@ export default function ReportGenerator() {
               <option value="last90">Last 90 Days</option>
             </select>
           </div>
+                    <div className="flex-grow">
+                        <label htmlFor="academic-year-filter" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Academic Year</label>
+                        <input id="academic-year-filter" name="academicYear" value={filters.academicYear} onChange={handleFilterChange} placeholder="2025-26" className="mt-1 block w-full p-2 border-gray-300 dark:border-gray-500 rounded-md" />
+                    </div>
+                    <div className="flex-grow">
+                        <label htmlFor="semester-filter" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Semester</label>
+                        <select id="semester-filter" name="semester" value={filters.semester} onChange={handleFilterChange} className="mt-1 block w-full p-2 border-gray-300 dark:border-gray-500 rounded-md">
+                            <option value="all">All</option>
+                            {Array.from({ length: 8 }).map((_, i) => <option key={i+1} value={i+1}>{i+1}</option>)}
+                        </select>
+                    </div>
+                    <div className="flex-grow">
+                        <label htmlFor="section-filter" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Section</label>
+                        <select id="section-filter" name="section" value={filters.section} onChange={handleFilterChange} className="mt-1 block w-full p-2 border-gray-300 dark:border-gray-500 rounded-md">
+                            <option value="all">All</option>
+                            <option value="A">A</option>
+                            <option value="B">B</option>
+                            <option value="C">C</option>
+                        </select>
+                    </div>
+                    <div className="flex-grow">
+                        <label htmlFor="subject-filter" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Subject</label>
+                        <select id="subject-filter" name="subject" value={filters.subject} onChange={handleFilterChange} className="mt-1 block w-full p-2 border-gray-300 dark:border-gray-500 rounded-md">
+                            <option value="all">All</option>
+                            {subjects.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                    </div>
           <button onClick={handleGenerate} disabled={loading} className="px-5 py-2 bg-primary-600 text-white rounded-md font-semibold hover:bg-primary-700 flex items-center disabled:bg-primary-400">
               {loading ? <Loader2 size={18} className="animate-spin mr-2" /> : null}
               {loading ? 'Generating...' : 'Generate Report'}

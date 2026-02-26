@@ -1,16 +1,21 @@
 import express from 'express';
+import multer from 'multer';
 import { 
     getStreams, getStreamByName, addStream, updateStream, deleteStream, 
     addSemester, deleteSemester,
     addSubject, updateSubject, deleteSubject, 
-    getAllSubjects, getSubjectsForSemester
+    getAllSubjects, getSubjectsForSemester,
+    exportStreams, importStreams
 } from '../controllers/streamController.js';
 import { protect, admin, teacherOrAdmin } from '../middleware/authMiddleware.js';
 
+const upload = multer({ storage: multer.memoryStorage() });
 const router = express.Router();
 
 // --- Public or Semi-Public Routes ---
 router.route('/all-subjects').get(protect, admin, getAllSubjects);
+router.route('/export').get(protect, admin, exportStreams);
+router.route('/import').post(protect, admin, upload.single('file'), importStreams);
 router.route('/name/:name').get(protect, teacherOrAdmin, getStreamByName);
 router.route('/:streamName/:semester/subjects').get(protect, teacherOrAdmin, getSubjectsForSemester);
 

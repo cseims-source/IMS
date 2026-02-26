@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNotification } from '../../contexts/NotificationContext';
+import { handleExportWithNotification } from '../../utils/exportUtils';
 import { 
     FileText, BookOpen, Layers, Library, Search, Filter, 
     Plus, Sparkles, Trash2, Download, ChevronDown, 
     Database, Cpu, X, Loader2, RefreshCw
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { useNotification } from '../../contexts/NotificationContext';
 import Spinner from '../../components/Spinner';
 
 const StatCard = ({ title, value, icon, color, delay }) => (
@@ -40,6 +41,20 @@ export default function QuestionBank() {
     const [aiTopic, setAiTopic] = useState('');
     const [aiLoading, setAiLoading] = useState(false);
     const [aiQuestions, setAiQuestions] = useState(null);
+
+    const [isUploadOpen, setIsUploadOpen] = useState(false);
+    const [uploading, setUploading] = useState(false);
+    const [importFile, setImportFile] = useState(null);
+    const [uploadForm, setUploadForm] = useState({
+        title: '',
+        course: '',
+        branch: '',
+        semester: '',
+        subject: '',
+        academicYear: '',
+        difficulty: 'Medium',
+        fileUrl: ''
+    });
 
     const [filters, setFilters] = useState({
         rows: '20',
@@ -83,6 +98,46 @@ export default function QuestionBank() {
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleUpload = async () => {
+        if (!uploadForm.title || !uploadForm.course || !uploadForm.branch || !uploadForm.semester || !uploadForm.subject || !uploadForm.academicYear) {
+            return addToast('Fill all required fields.', 'info');
+        }
+        setUploading(true);
+        try {
+            await api('/api/question-papers', {
+                method: 'POST',
+                body: JSON.stringify({
+                    ...uploadForm,
+                    semester: Number(uploadForm.semester)
+                })
+            });
+            setIsUploadOpen(false);
+            setUploadForm({ title: '', course: '', branch: '', semester: '', subject: '', academicYear: '', difficulty: 'Medium', fileUrl: '' });
+            fetchPapers();
+            fetchMetadata();
+            addToast('Paper uploaded.', 'success');
+        } catch (err) {
+            addToast('Upload failed.', 'error');
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    const handleImport = async () => {
+        if (!importFile) return addToast('Select a file first.', 'info');
+        const formData = new FormData();
+        formData.append('file', importFile);
+        await api('/api/question-papers/import', { method: 'POST', body: formData });
+        setImportFile(null);
+        fetchPapers();
+        fetchMetadata();
+        addToast('Import completed.', 'success');
+    };
+
+    const handleExport = () => {
+        handleExportWithNotification(addToast, '/api/question-papers/export', 'question-papers', {}, 'csv');
     };
 
     const handleSearch = (e) => {
@@ -141,15 +196,37 @@ export default function QuestionBank() {
                     </p>
                 </div>
                 <div className="flex flex-wrap gap-3 w-full lg:w-auto">
+                    <button
+                        onClick={handleExport}
+                        className="flex-1 lg:flex-none flex items-center justify-center px-6 py-3.5 bg-gray-900 text-white rounded-2xl font-black uppercase text-[0.65rem] tracking-[0.2em] hover:bg-gray-800 transition shadow-lg active:scale-95"
+                    >
+                        <Download size={16} className="mr-2" /> Export CSV
+                    </button>
+                    {user?.role !== 'Student' && (
+                        <label className="flex-1 lg:flex-none flex items-center justify-center px-6 py-3.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl font-black uppercase text-[0.65rem] tracking-[0.2em] cursor-pointer">
+                            <input type="file" accept=".csv,.xlsx" className="hidden" onChange={(e) => setImportFile(e.target.files?.[0] || null)} />
+                            {importFile ? importFile.name : 'Import CSV/XLSX'}
+                        </label>
+                    )}
+                    {user?.role !== 'Student' && (
+                        <button
+                            onClick={handleImport}
+                            className="flex-1 lg:flex-none flex items-center justify-center px-6 py-3.5 bg-emerald-600 text-white rounded-2xl font-black uppercase text-[0.65rem] tracking-[0.2em] hover:bg-emerald-700 transition shadow-lg active:scale-95"
+                        >
+                            Upload
+                        </button>
+                    )}
                     <button 
                         onClick={() => setIsAIOpen(true)}
                         className="flex-1 lg:flex-none flex items-center justify-center px-6 py-3.5 bg-indigo-600/10 text-indigo-600 dark:text-indigo-400 border border-indigo-600/20 rounded-2xl font-black uppercase text-[0.65rem] tracking-[0.2em] hover:bg-indigo-600 hover:text-white transition-all shadow-xl active:scale-95 group"
                     >
                         <Sparkles size={16} className="mr-2 group-hover:rotate-12 transition-transform" /> AI Synthesizer
                     </button>
-                    <button className="flex-1 lg:flex-none flex items-center justify-center px-6 py-3.5 bg-primary-600 text-white rounded-2xl font-black uppercase text-[0.65rem] tracking-[0.2em] hover:bg-primary-700 transition shadow-lg shadow-primary-500/30 active:scale-95 group">
-                        <Plus size={16} className="mr-2 group-hover:rotate-90 transition-transform" /> Upload Paper
-                    </button>
+                    {user?.role !== 'Student' && (
+                        <button onClick={() => setIsUploadOpen(true)} className="flex-1 lg:flex-none flex items-center justify-center px-6 py-3.5 bg-primary-600 text-white rounded-2xl font-black uppercase text-[0.65rem] tracking-[0.2em] hover:bg-primary-700 transition shadow-lg shadow-primary-500/30 active:scale-95 group">
+                            <Plus size={16} className="mr-2 group-hover:rotate-90 transition-transform" /> Upload Paper
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -307,6 +384,35 @@ export default function QuestionBank() {
                     </div>
                 )}
             </div>
+
+            {isUploadOpen && (
+                <div className="fixed inset-0 bg-black/60 flex justify-center items-center z-50 p-4">
+                    <div className="bg-white dark:bg-gray-900 p-6 rounded-2xl w-full max-w-lg">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-lg font-bold">Upload Question Paper</h3>
+                            <button onClick={() => setIsUploadOpen(false)}><X size={18} /></button>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <input value={uploadForm.title} onChange={(e) => setUploadForm(p => ({ ...p, title: e.target.value }))} placeholder="Title" className="p-2 border rounded" />
+                            <input value={uploadForm.course} onChange={(e) => setUploadForm(p => ({ ...p, course: e.target.value }))} placeholder="Course" className="p-2 border rounded" />
+                            <input value={uploadForm.branch} onChange={(e) => setUploadForm(p => ({ ...p, branch: e.target.value }))} placeholder="Branch" className="p-2 border rounded" />
+                            <input value={uploadForm.semester} onChange={(e) => setUploadForm(p => ({ ...p, semester: e.target.value }))} placeholder="Semester" className="p-2 border rounded" />
+                            <input value={uploadForm.subject} onChange={(e) => setUploadForm(p => ({ ...p, subject: e.target.value }))} placeholder="Subject" className="p-2 border rounded" />
+                            <input value={uploadForm.academicYear} onChange={(e) => setUploadForm(p => ({ ...p, academicYear: e.target.value }))} placeholder="Academic Year" className="p-2 border rounded" />
+                            <select value={uploadForm.difficulty} onChange={(e) => setUploadForm(p => ({ ...p, difficulty: e.target.value }))} className="p-2 border rounded">
+                                <option>Easy</option><option>Medium</option><option>Hard</option>
+                            </select>
+                            <input value={uploadForm.fileUrl} onChange={(e) => setUploadForm(p => ({ ...p, fileUrl: e.target.value }))} placeholder="File URL (optional)" className="p-2 border rounded" />
+                        </div>
+                        <div className="flex justify-end gap-2 mt-4">
+                            <button onClick={() => setIsUploadOpen(false)} className="px-4 py-2 bg-gray-200 rounded">Cancel</button>
+                            <button onClick={handleUpload} disabled={uploading} className="px-4 py-2 bg-primary-600 text-white rounded">
+                                {uploading ? 'Uploading...' : 'Save'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {isAIOpen && (
                 <div className="fixed inset-0 bg-gray-950/90 backdrop-blur-xl flex justify-center items-center z-[120] p-4 animate-fade-in">

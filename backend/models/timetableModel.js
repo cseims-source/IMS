@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 
 const timetableSchema = mongoose.Schema({
     stream: { type: String, required: true }, // e.g., 'B.Tech CSE'
+    streamId: { type: mongoose.Schema.Types.ObjectId, ref: 'Stream' },
     semester: { type: Number, required: true },
     schedule: { type: Map, of: Object } // Flexible structure: { Monday: { '9:00 AM': { ... } } }
 }, {

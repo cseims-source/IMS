@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { Target, Lightbulb, History, CheckCircle } from 'lucide-react';
 
 const InstituteHistory = () => {
@@ -83,6 +84,18 @@ const InstituteHistory = () => {
                 <div className="mt-8 flex justify-end">
                     <div className="h-2 w-24 bg-gradient-to-r from-purple-400 to-pink-500 rounded-full"></div>
                 </div>
+            </div>
+        </div>
+
+        <div className="mt-12 bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border border-gray-100 dark:border-gray-700">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Quick Access</h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <Link to="/app/admission-requests" className="px-4 py-3 bg-gray-50 dark:bg-gray-900 rounded-xl text-sm font-bold text-gray-700 dark:text-gray-200 text-center">Admissions</Link>
+                <Link to="/app/courses" className="px-4 py-3 bg-gray-50 dark:bg-gray-900 rounded-xl text-sm font-bold text-gray-700 dark:text-gray-200 text-center">Courses</Link>
+                <Link to="/app/streams" className="px-4 py-3 bg-gray-50 dark:bg-gray-900 rounded-xl text-sm font-bold text-gray-700 dark:text-gray-200 text-center">Streams</Link>
+                <Link to="/app/library" className="px-4 py-3 bg-gray-50 dark:bg-gray-900 rounded-xl text-sm font-bold text-gray-700 dark:text-gray-200 text-center">Library</Link>
+                <Link to="/app/notice-board" className="px-4 py-3 bg-gray-50 dark:bg-gray-900 rounded-xl text-sm font-bold text-gray-700 dark:text-gray-200 text-center">Notices</Link>
+                <Link to="/app/event-calendar" className="px-4 py-3 bg-gray-50 dark:bg-gray-900 rounded-xl text-sm font-bold text-gray-700 dark:text-gray-200 text-center">Events</Link>
             </div>
         </div>
 

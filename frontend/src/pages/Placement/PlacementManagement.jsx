@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import { Building, Briefcase, UserCheck, Plus, Edit, Trash2, Users } from 'lucide-react';
+import { handleExportWithNotification } from '../../utils/exportUtils';
 import ConfirmationModal from '../../components/ConfirmationModal';
 
 const CompanyForm = ({ company, onSave, onCancel }) => {
@@ -42,7 +43,7 @@ const JobForm = ({ job, companies, onSave, onCancel }) => {
     )
 };
 
-const Companies = ({ companies, onAdd, onUpdate, onDelete }) => {
+const Companies = ({ companies, onAdd, onUpdate, onDelete, onExport }) => {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingCompany, setEditingCompany] = useState(null);
 
@@ -64,9 +65,12 @@ const Companies = ({ companies, onAdd, onUpdate, onDelete }) => {
     <div>
         <div className="flex justify-between items-center mb-4">
             <h3 className="text-xl font-semibold">Companies</h3>
-            <button onClick={() => { setEditingCompany(null); setIsFormOpen(true); }} className="flex items-center px-3 py-1.5 bg-primary-500 text-white rounded-md text-sm hover:bg-primary-600">
-                <Plus size={16} className="mr-1" /> Add Company
-            </button>
+            <div className="flex gap-2">
+                <button onClick={onExport} className="px-3 py-1.5 bg-gray-900 text-white rounded-md text-sm">Export</button>
+                <button onClick={() => { setEditingCompany(null); setIsFormOpen(true); }} className="flex items-center px-3 py-1.5 bg-primary-500 text-white rounded-md text-sm hover:bg-primary-600">
+                    <Plus size={16} className="mr-1" /> Add Company
+                </button>
+            </div>
         </div>
         <table className="w-full text-left">
             <thead><tr className="bg-gray-100"><th className="p-3">Name</th><th className="p-3">Sector</th><th className="p-3">Actions</th></tr></thead>
@@ -86,7 +90,7 @@ const Companies = ({ companies, onAdd, onUpdate, onDelete }) => {
     </div>
 )};
 
-const Jobs = ({ user, jobs, companies, onAdd, onUpdate, onDelete, onApply, applications }) => {
+const Jobs = ({ user, jobs, companies, onAdd, onUpdate, onDelete, onApply, applications, onExport }) => {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingJob, setEditingJob] = useState(null);
     const appliedJobIds = new Set(applications.map(app => app.job._id));
@@ -109,7 +113,12 @@ const Jobs = ({ user, jobs, companies, onAdd, onUpdate, onDelete, onApply, appli
     <div>
         <div className="flex justify-between items-center mb-4">
             <h3 className="text-xl font-semibold">Job Postings</h3>
-            {user.role === 'Admin' && <button onClick={() => { setEditingJob(null); setIsFormOpen(true); }} className="flex items-center px-3 py-1.5 bg-primary-500 text-white rounded-md text-sm hover:bg-primary-600"><Plus size={16} className="mr-1" /> Add Job</button>}
+            {user.role === 'Admin' && (
+                <div className="flex gap-2">
+                    <button onClick={onExport} className="px-3 py-1.5 bg-gray-900 text-white rounded-md text-sm">Export</button>
+                    <button onClick={() => { setEditingJob(null); setIsFormOpen(true); }} className="flex items-center px-3 py-1.5 bg-primary-500 text-white rounded-md text-sm hover:bg-primary-600"><Plus size={16} className="mr-1" /> Add Job</button>
+                </div>
+            )}
         </div>
         <table className="w-full text-left">
             <thead><tr className="bg-gray-100"><th className="p-3">Title</th><th className="p-3">Company</th><th className="p-3">Status</th><th className="p-3">Action</th></tr></thead>
@@ -140,9 +149,12 @@ const Jobs = ({ user, jobs, companies, onAdd, onUpdate, onDelete, onApply, appli
     </div>
 )};
 
-const Applications = ({ applications, isAdmin }) => (
+const Applications = ({ applications, isAdmin, onStatusChange, onExport }) => (
     <div>
-        <h3 className="text-xl font-semibold mb-4">{isAdmin ? 'All Student Applications' : 'My Applications'}</h3>
+        <div className="flex justify-between items-center mb-4">
+            <h3 className="text-xl font-semibold">{isAdmin ? 'All Student Applications' : 'My Applications'}</h3>
+            {isAdmin && <button onClick={onExport} className="px-3 py-1.5 bg-gray-900 text-white rounded-md text-sm">Export</button>}
+        </div>
         <table className="w-full text-left">
             <thead><tr className="bg-gray-100">
                 {isAdmin && <th className="p-3">Student</th>}
@@ -154,7 +166,19 @@ const Applications = ({ applications, isAdmin }) => (
                 {applications.map(app => (
                     <tr key={app._id} className="border-b">
                         {isAdmin && <td className="p-3">{app.student.name}</td>}
-                        <td className="p-3">{app.job.title}</td><td className="p-3">{app.job.company.name}</td><td className="p-3">{app.status}</td>
+                        <td className="p-3">{app.job.title}</td><td className="p-3">{app.job.company.name}</td>
+                        <td className="p-3">
+                            {isAdmin ? (
+                                <select value={app.status} onChange={(e) => onStatusChange(app._id, e.target.value)} className="p-1.5 border rounded-md text-sm">
+                                    <option>Applied</option>
+                                    <option>Shortlisted</option>
+                                    <option>Selected</option>
+                                    <option>Rejected</option>
+                                </select>
+                            ) : (
+                                app.status
+                            )}
+                        </td>
                     </tr>
                 ))}
             </tbody>
@@ -171,16 +195,37 @@ export default function PlacementManagement() {
     const [jobs, setJobs] = useState([]);
     const [applications, setApplications] = useState([]);
     const [confirmAction, setConfirmAction] = useState(null);
+    const [stats, setStats] = useState(null);
+    const [companySearch, setCompanySearch] = useState('');
+    const [jobSearch, setJobSearch] = useState('');
+    const [jobStatus, setJobStatus] = useState('All');
+    const [jobCompany, setJobCompany] = useState('');
+    const [applicationStatus, setApplicationStatus] = useState('All');
 
     useEffect(() => {
         fetchCompanies();
         fetchJobs();
         fetchApplications();
+        if (user.role === 'Admin') fetchStats();
     }, [user.role, api]);
 
-    const fetchCompanies = async () => setCompanies(await api('/api/placements/companies'));
-    const fetchJobs = async () => setJobs(await api('/api/placements/jobs'));
-    const fetchApplications = async () => setApplications(await api('/api/placements/applications'));
+    const fetchCompanies = async () => {
+        const params = new URLSearchParams({ search: companySearch });
+        setCompanies(await api(`/api/placements/companies?${params.toString()}`));
+    };
+    const fetchJobs = async () => {
+        const params = new URLSearchParams({
+            search: jobSearch,
+            status: jobStatus,
+            company: jobCompany
+        });
+        setJobs(await api(`/api/placements/jobs?${params.toString()}`));
+    };
+    const fetchApplications = async () => {
+        const params = new URLSearchParams({ status: applicationStatus });
+        setApplications(await api(`/api/placements/applications?${params.toString()}`));
+    };
+    const fetchStats = async () => setStats(await api('/api/placements/stats'));
 
     const handleAddCompany = async (companyData) => { await api('/api/placements/companies', { method: 'POST', body: JSON.stringify(companyData) }); fetchCompanies(); };
     const handleUpdateCompany = async (id, companyData) => { await api(`/api/placements/companies/${id}`, { method: 'PUT', body: JSON.stringify(companyData) }); fetchCompanies(); };
@@ -220,6 +265,18 @@ export default function PlacementManagement() {
         }
     };
 
+    const handleUpdateApplicationStatus = async (id, status) => {
+        try {
+            const updated = await api(`/api/placements/applications/${id}/status`, {
+                method: 'PUT',
+                body: JSON.stringify({ status })
+            });
+            setApplications(prev => prev.map(a => a._id === id ? updated : a));
+        } catch (error) {
+            addToast(error.message || 'Failed to update status.', 'error');
+        }
+    };
+
     const tabs = user.role === 'Admin'
         ? [
             { id: 'companies', name: 'Companies', icon: <Building size={18} /> }, 
@@ -234,6 +291,25 @@ export default function PlacementManagement() {
     return (
         <div className="bg-white p-8 rounded-xl shadow-lg">
             <h1 className="text-3xl font-bold text-gray-800 mb-6">Training & Placement</h1>
+
+            {stats && user.role === 'Admin' && (
+                <div className="grid grid-cols-2 md:grid-cols-7 gap-4 mb-6">
+                    {[
+                        { label: 'Companies', value: stats.companies },
+                        { label: 'Jobs', value: stats.jobs },
+                        { label: 'Applications', value: stats.applications },
+                        { label: 'Applied', value: stats.applied },
+                        { label: 'Shortlisted', value: stats.shortlisted },
+                        { label: 'Selected', value: stats.selected },
+                        { label: 'Rejected', value: stats.rejected }
+                    ].map(item => (
+                        <div key={item.label} className="bg-gray-50 p-4 rounded-xl text-center">
+                            <p className="text-[0.6rem] font-black uppercase text-gray-400">{item.label}</p>
+                            <p className="text-2xl font-black text-gray-900">{item.value}</p>
+                        </div>
+                    ))}
+                </div>
+            )}
             
             <div className="border-b border-gray-200">
                 <nav className="-mb-px flex space-x-6" aria-label="Tabs">
@@ -254,9 +330,42 @@ export default function PlacementManagement() {
             </div>
 
             <div className="mt-6">
-                {activeTab === 'companies' && user.role === 'Admin' && <Companies companies={companies} onAdd={handleAddCompany} onUpdate={handleUpdateCompany} onDelete={handleDeleteCompany} />}
-                {activeTab === 'jobs' && <Jobs user={user} jobs={jobs} companies={companies} onAdd={handleAddJob} onUpdate={handleUpdateJob} onDelete={handleDeleteJob} onApply={handleApply} applications={applications}/>}
-                {activeTab === 'applications' && <Applications applications={applications} isAdmin={user.role === 'Admin'} />}
+                {activeTab === 'companies' && user.role === 'Admin' && (
+                    <div>
+                        <div className="flex gap-2 mb-4">
+                            <input value={companySearch} onChange={(e) => setCompanySearch(e.target.value)} placeholder="Search companies" className="p-2 border rounded-md" />
+                            <button onClick={fetchCompanies} className="px-3 py-2 bg-primary-600 text-white rounded-md text-sm">Apply</button>
+                        </div>
+                        <Companies companies={companies} onAdd={handleAddCompany} onUpdate={handleUpdateCompany} onDelete={handleDeleteCompany} onExport={() => handleExportWithNotification(addToast, '/api/placements/export/companies', 'placement-companies', {}, 'csv')} />
+                    </div>
+                )}
+                {activeTab === 'jobs' && (
+                    <div>
+                        <div className="flex flex-wrap gap-2 mb-4">
+                            <input value={jobSearch} onChange={(e) => setJobSearch(e.target.value)} placeholder="Search jobs" className="p-2 border rounded-md" />
+                            <select value={jobStatus} onChange={(e) => setJobStatus(e.target.value)} className="p-2 border rounded-md">
+                                <option>All</option><option>Open</option><option>Closed</option>
+                            </select>
+                            <select value={jobCompany} onChange={(e) => setJobCompany(e.target.value)} className="p-2 border rounded-md">
+                                <option value="">All Companies</option>
+                                {companies.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
+                            </select>
+                            <button onClick={fetchJobs} className="px-3 py-2 bg-primary-600 text-white rounded-md text-sm">Apply</button>
+                        </div>
+                        <Jobs user={user} jobs={jobs} companies={companies} onAdd={handleAddJob} onUpdate={handleUpdateJob} onDelete={handleDeleteJob} onApply={handleApply} applications={applications} onExport={() => handleExportWithNotification(addToast, '/api/placements/export/jobs', 'placement-jobs', {}, 'csv')} />
+                    </div>
+                )}
+                {activeTab === 'applications' && (
+                    <div>
+                        <div className="flex flex-wrap gap-2 mb-4">
+                            <select value={applicationStatus} onChange={(e) => setApplicationStatus(e.target.value)} className="p-2 border rounded-md">
+                                <option>All</option><option>Applied</option><option>Shortlisted</option><option>Selected</option><option>Rejected</option>
+                            </select>
+                            <button onClick={fetchApplications} className="px-3 py-2 bg-primary-600 text-white rounded-md text-sm">Apply</button>
+                        </div>
+                        <Applications applications={applications} isAdmin={user.role === 'Admin'} onStatusChange={handleUpdateApplicationStatus} onExport={() => handleExportWithNotification(addToast, '/api/placements/export/applications', 'placement-applications', {}, 'csv')} />
+                    </div>
+                )}
             </div>
 
             <ConfirmationModal

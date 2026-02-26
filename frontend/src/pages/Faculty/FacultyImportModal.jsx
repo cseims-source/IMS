@@ -2,29 +2,61 @@ import React, { useState, useCallback } from 'react';
 import { X, UploadCloud, FileText, CheckCircle, AlertTriangle, Loader2, Cpu, ArrowRight } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import * as XLSX from 'https://esm.sh/xlsx@0.18.5';
+import { normalizePhotoUrl } from '../../utils/photoUtils';
 
 // AIET Expert Logic Mapping Sequence
 const HEADER_MAP = {
+    "USERNAME": "username",
+    "STAFF TYPE": "staffType",
+    "STAFF CATEGORY": "staffType",
+    "TYPE": "staffType",
     "NAME": "name",
     "FACULTY NAME": "name",
+    "NAME OF THE STAFF": "name",
     "EMAIL": "email",
     "OFFICIAL EMAIL": "email",
+    "E-MAIL ID": "email",
     "PHONE": "phone",
     "MOBILE": "phone",
     "CONTACT": "phone",
+    "CONTACT NO": "phone",
+    "CONTACT NO ": "phone",
+    "WHATSAAP NO": "whatsappNo",
+    "WHATSAPP NO": "whatsappNo",
+    "WHATSAPP NUMBER": "whatsappNo",
     "DEPARTMENT": "department",
     "DEPT": "department",
     "DEPT HUB": "department",
     "DESIGNATION": "designation",
     "TITLE": "designation",
     "POSITION": "designation",
+    "FATHER'S NAME": "fatherName",
+    "MOTHER'S NAME": "motherName",
+    "AADHAR CARD NO": "aadharNo",
+    "PAN CARD NO": "panNo",
+    "CASTE": "caste",
+    "BLOOD GROUP": "bloodGroup",
+    "BLOOD GROUP ": "bloodGroup",
+    "RELIGION": "religion",
     "SUBJECT": "subject",
     "EXPERTISE": "subject",
     "QUALIFICATION": "qualification",
     "CREDENTIALS": "qualification",
+    "HIGHEST QUALIFICATION WITH PASS OUT YEAR": "highestQualification",
+    "TEACHER ID (BPUT)": "teacherId",
+    "PASS PORT SIZE PHOTO": "photo",
     "EXPERIENCE": "experienceYears",
     "EXP": "experienceYears",
-    "JOINING DATE": "joiningDate"
+    "JOINING DATE": "joiningDate",
+    "DATE  OF JOINING (D.O.J.)": "joiningDate",
+    "DATE OF JOINING (D.O.J.)": "joiningDate",
+    "DATE OF BIRTH (D.O.B.)": "dateOfBirth",
+    "DATE OF LEAVE": "dateOfLeave",
+    "SL.NO": "serialNo",
+    "SL. NO": "serialNo",
+    "SL NO": "serialNo",
+    "PERMANENT ADDRESS (AT/ POST/ POLICE STATION/ VIA/ DIST/ PIN/STATE)": "address.permanent",
+    "PRESENT ADDRESS (AT/ POST/ POLICE STATION/ VIA/ DIST/ PIN/ STATE)": "address.current"
 };
 
 const FacultyImportModal = ({ onClose, onImportSuccess }) => {
@@ -43,10 +75,50 @@ const FacultyImportModal = ({ onClose, onImportSuccess }) => {
         }
     };
 
+    const toIsoDateString = (value) => {
+        if (!value) return '';
+        if (value instanceof Date && !isNaN(value.getTime())) return value.toISOString();
+
+        if (typeof value === 'number') {
+            const dateCode = XLSX.SSF.parse_date_code(value);
+            if (dateCode) {
+                const { y, m, d } = dateCode;
+                const date = new Date(y, m - 1, d);
+                return isNaN(date.getTime()) ? '' : date.toISOString();
+            }
+        }
+
+        if (typeof value === 'string') {
+            const trimmed = value.trim();
+            if (!trimmed) return '';
+            const date = new Date(trimmed);
+            return isNaN(date.getTime()) ? '' : date.toISOString();
+        }
+
+        return '';
+    };
+
     const processFacultyLattice = (rawJson) => {
+        let currentStaffType = 'Teaching';
+
         return rawJson.map(row => {
+            const rawValues = Object.values(row)
+                .filter(v => typeof v === 'string')
+                .map(v => v.trim().toUpperCase());
+
+            if (rawValues.some(v => v === 'NON - TEACHING STAFF' || v === 'NON-TEACHING STAFF' || v === 'NON TEACHING STAFF')) {
+                currentStaffType = 'Non-Teaching';
+                return null;
+            }
+
+            if (rawValues.some(v => v === 'TEACHING STAFF')) {
+                currentStaffType = 'Teaching';
+                return null;
+            }
+
             const faculty = {
                 status: 'Active',
+                staffType: currentStaffType,
                 assignedStreams: [],
                 assignedSubjects: [],
                 address: { current: '', permanent: '' }
@@ -61,44 +133,55 @@ const FacultyImportModal = ({ onClose, onImportSuccess }) => {
                         faculty[targetField] = Number(value) || 0;
                     } else if (targetField === 'email') {
                         faculty[targetField] = String(value).toLowerCase().trim();
+                    } else if (targetField === 'joiningDate' || targetField === 'dateOfBirth' || targetField === 'dateOfLeave') {
+                        faculty[targetField] = toIsoDateString(value);
+                    } else if (targetField === 'staffType') {
+                        const normalized = String(value).trim().toLowerCase();
+                        faculty.staffType = normalized.includes('non') ? 'Non-Teaching' : 'Teaching';
+                    } else if (targetField === 'photo') {
+                        faculty.photo = normalizePhotoUrl(String(value).trim());
+                    } else if (targetField.startsWith('address.')) {
+                        const addressKey = targetField.split('.')[1];
+                        faculty.address[addressKey] = String(value).trim();
                     } else {
                         faculty[targetField] = String(value).trim();
                     }
                 }
             });
 
+            if (faculty.dateOfLeave) {
+                faculty.status = 'Discontinued';
+            }
+
             return faculty;
-        });
+        }).filter(Boolean);
     };
 
-    const parseFile = useCallback(() => {
+    const parseFile = useCallback(async () => {
         if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            try {
-                const data = new Uint8Array(e.target.result);
-                const workbook = XLSX.read(data, { type: 'array' });
-                const sheetName = workbook.SheetNames[0];
+        try {
+            const buffer = await file.arrayBuffer();
+            const workbook = XLSX.read(buffer, { type: 'array', cellDates: true, dateNF: 'yyyy-mm-dd' });
+            const allRows = workbook.SheetNames.flatMap((sheetName) => {
                 const worksheet = workbook.Sheets[sheetName];
-                const json = XLSX.utils.sheet_to_json(worksheet);
+                return XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+            });
 
-                if (json.length === 0) return setError('Buffer empty. No node data found.');
+            if (allRows.length === 0) return setError('Buffer empty. No node data found.');
 
-                const translated = processFacultyLattice(json);
-                
-                // Verify core identity markers
-                const first = translated[0];
-                if (!first.name || !first.email || !first.subject) {
-                    return setError('Identity markers "Name", "Email", and "Subject" are mandatory in your sheet.');
-                }
-
-                setMappedData(translated);
-                setStatus('preview');
-            } catch (err) {
-                setError('Neural Decryption Failed. Check file integrity.');
+            const translated = processFacultyLattice(allRows);
+            
+            const validRows = translated.filter(row => row.name && row.email);
+            if (validRows.length === 0) {
+                return setError('No valid rows found with both "Name" and "Email" across all sheets.');
             }
-        };
-        reader.readAsArrayBuffer(file);
+
+            setMappedData(validRows);
+            setStatus('preview');
+        } catch (err) {
+            console.error('Excel parse error:', err);
+            setError(`Neural Decryption Failed. ${err?.message || 'Check file integrity.'}`);
+        }
     }, [file]);
 
     const handleImport = async () => {
@@ -169,11 +252,11 @@ const FacultyImportModal = ({ onClose, onImportSuccess }) => {
                                     <table className="w-full text-[0.6rem] text-left">
                                         <thead className="bg-gray-100 dark:bg-gray-900 sticky top-0 font-black uppercase tracking-widest text-gray-500">
                                             <tr>
-                                                <th className="p-5 pl-8">Expert Identity</th>
-                                                <th className="p-5">Department Hub</th>
+                                                <th className="p-5 pl-8">Name of the Staff</th>
+                                                <th className="p-5">Department</th>
                                                 <th className="p-5">Designation</th>
-                                                <th className="p-5">Primary Subject</th>
-                                                <th className="p-5 pr-8">Logic Email</th>
+                                                <th className="p-5">Contact No</th>
+                                                <th className="p-5 pr-8">E-mail ID</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y dark:divide-gray-800">
@@ -182,7 +265,7 @@ const FacultyImportModal = ({ onClose, onImportSuccess }) => {
                                                     <td className="p-5 pl-8">{row.name}</td>
                                                     <td className="p-5"><span className="px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900/50 rounded-md text-[0.55rem]">{row.department}</span></td>
                                                     <td className="p-5 text-indigo-500">{row.designation}</td>
-                                                    <td className="p-5">{row.subject}</td>
+                                                    <td className="p-5">{row.phone}</td>
                                                     <td className="p-5 pr-8 opacity-60 italic">{row.email}</td>
                                                 </tr>
                                             ))}

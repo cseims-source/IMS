@@ -8,6 +8,7 @@ import {
     Eye, X, Database, Users, Fingerprint, Award
 } from 'lucide-react';
 import { formatDateTime, formatDate } from '../../utils/dateFormatter';
+import { handleExportWithNotification } from '../../utils/exportUtils';
 import ConfirmationModal from '../../components/ConfirmationModal';
 import Spinner from '../../components/Spinner';
 
@@ -158,16 +159,28 @@ export default function AdmissionRequests() {
     const { api } = useAuth();
     const { addToast } = useNotification();
     const [inquiries, setInquiries] = useState([]);
+    const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState('All');
+    const [filterCourse, setFilterCourse] = useState('All');
+    const [filterBranch, setFilterBranch] = useState('All');
+    const [filterYear, setFilterYear] = useState('All');
     const [confirmDelete, setConfirmDelete] = useState(null);
     const [viewingInquiry, setViewingInquiry] = useState(null);
+    const [importFile, setImportFile] = useState(null);
 
     const fetchInquiries = useCallback(async () => {
         setLoading(true);
         try {
-            const data = await api('/api/admission/requests');
+            const params = new URLSearchParams({
+                status: filterStatus,
+                course: filterCourse,
+                branch: filterBranch,
+                academicYear: filterYear,
+                search: searchTerm
+            });
+            const data = await api(`/api/admission/requests?${params.toString()}`);
             setInquiries(data);
         } catch (error) {
             console.error("Failed to fetch inquiries", error);
@@ -175,11 +188,21 @@ export default function AdmissionRequests() {
         } finally {
             setLoading(false);
         }
-    }, [api, addToast]);
+    }, [api, addToast, filterStatus, filterCourse, filterBranch, filterYear, searchTerm]);
+
+    const fetchStats = useCallback(async () => {
+        try {
+            const data = await api('/api/admission/stats');
+            setStats(data);
+        } catch (error) {
+            setStats(null);
+        }
+    }, [api]);
 
     useEffect(() => {
         fetchInquiries();
-    }, [fetchInquiries]);
+        fetchStats();
+    }, [fetchInquiries, fetchStats]);
 
     const handleUpdate = async (id, updateData) => {
         try {
@@ -208,15 +231,27 @@ export default function AdmissionRequests() {
         }
     };
 
-    const filteredInquiries = useMemo(() => {
-        return inquiries.filter(item => {
-            const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                                  item.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                  item.course.toLowerCase().includes(searchTerm.toLowerCase());
-            const matchesStatus = filterStatus === 'All' || item.status === filterStatus;
-            return matchesSearch && matchesStatus;
-        });
-    }, [inquiries, searchTerm, filterStatus]);
+    const handleImport = async () => {
+        if (!importFile) {
+            addToast('Select a file to import.', 'error');
+            return;
+        }
+        try {
+            const formData = new FormData();
+            formData.append('file', importFile);
+            await api('/api/admission/import', { method: 'POST', body: formData });
+            addToast('Admissions imported.', 'success');
+            setImportFile(null);
+            fetchInquiries();
+            fetchStats();
+        } catch (error) {
+            addToast(error.message || 'Import failed.', 'error');
+        }
+    };
+
+    const courseOptions = useMemo(() => [...new Set(inquiries.map(i => i.course).filter(Boolean))], [inquiries]);
+    const branchOptions = useMemo(() => [...new Set(inquiries.map(i => i.branch).filter(Boolean))], [inquiries]);
+    const yearOptions = useMemo(() => [...new Set(inquiries.map(i => i.academicYear).filter(Boolean))], [inquiries]);
 
     return (
         <div className="space-y-8 animate-fade-in max-w-[1600px] mx-auto pb-20">
@@ -253,8 +288,65 @@ export default function AdmissionRequests() {
                             <option value="Waiting List">Waitlist</option>
                         </select>
                     </div>
+                    <div className="flex items-center gap-2 px-5 py-2.5 bg-gray-50 dark:bg-gray-950 rounded-2xl shadow-inner border border-gray-100 dark:border-gray-800">
+                        <Filter size={16} className="text-gray-400" />
+                        <select 
+                            value={filterCourse} 
+                            onChange={(e) => setFilterCourse(e.target.value)}
+                            className="bg-transparent border-0 focus:ring-0 font-black text-[0.6rem] uppercase tracking-widest text-gray-600 dark:text-gray-300 cursor-pointer"
+                        >
+                            <option value="All">All Courses</option>
+                            {courseOptions.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                    </div>
+                    <div className="flex items-center gap-2 px-5 py-2.5 bg-gray-50 dark:bg-gray-950 rounded-2xl shadow-inner border border-gray-100 dark:border-gray-800">
+                        <Filter size={16} className="text-gray-400" />
+                        <select 
+                            value={filterBranch} 
+                            onChange={(e) => setFilterBranch(e.target.value)}
+                            className="bg-transparent border-0 focus:ring-0 font-black text-[0.6rem] uppercase tracking-widest text-gray-600 dark:text-gray-300 cursor-pointer"
+                        >
+                            <option value="All">All Branches</option>
+                            {branchOptions.map(b => <option key={b} value={b}>{b}</option>)}
+                        </select>
+                    </div>
+                    <div className="flex items-center gap-2 px-5 py-2.5 bg-gray-50 dark:bg-gray-950 rounded-2xl shadow-inner border border-gray-100 dark:border-gray-800">
+                        <Filter size={16} className="text-gray-400" />
+                        <select 
+                            value={filterYear} 
+                            onChange={(e) => setFilterYear(e.target.value)}
+                            className="bg-transparent border-0 focus:ring-0 font-black text-[0.6rem] uppercase tracking-widest text-gray-600 dark:text-gray-300 cursor-pointer"
+                        >
+                            <option value="All">All Years</option>
+                            {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
+                        </select>
+                    </div>
+                    <label className="px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl text-[0.6rem] font-black uppercase tracking-widest cursor-pointer">
+                        <input type="file" accept=".csv,.xlsx" className="hidden" onChange={(e) => setImportFile(e.target.files?.[0] || null)} />
+                        {importFile ? importFile.name : 'Import CSV/XLSX'}
+                    </label>
+                    <button onClick={handleImport} className="px-6 py-2.5 bg-emerald-600 text-white font-black uppercase text-[0.6rem] tracking-widest rounded-2xl shadow-lg">Upload</button>
+                    <button onClick={() => handleExportWithNotification(addToast, '/api/admission/export', 'admission-requests', {}, 'csv')} className="px-6 py-2.5 bg-primary-600 text-white font-black uppercase text-[0.6rem] tracking-widest rounded-2xl shadow-lg">Export CSV</button>
                 </div>
             </div>
+
+            {stats && (
+                <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+                    {[
+                        { label: 'Total', value: stats.total },
+                        { label: 'New', value: stats.newCount },
+                        { label: 'Accepted', value: stats.accepted },
+                        { label: 'Rejected', value: stats.rejected },
+                        { label: 'Waiting', value: stats.waiting },
+                        { label: 'Last 7 Days', value: stats.recent }
+                    ].map(item => (
+                        <div key={item.label} className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 text-center">
+                            <p className="text-[0.6rem] font-black uppercase tracking-widest text-gray-400">{item.label}</p>
+                            <p className="text-2xl font-black text-gray-900 dark:text-white mt-2">{item.value}</p>
+                        </div>
+                    ))}
+                </div>
+            )}
 
             {loading ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 px-2">
@@ -262,7 +354,7 @@ export default function AdmissionRequests() {
                         <div key={i} className="h-[450px] bg-white dark:bg-gray-800 rounded-[3rem] animate-pulse border border-gray-100 dark:border-gray-700/50 shadow-sm"></div>
                     ))}
                 </div>
-            ) : filteredInquiries.length === 0 ? (
+            ) : inquiries.length === 0 ? (
                 <div className="text-center py-32 bg-white dark:bg-gray-800 rounded-[4rem] shadow-xl border border-dashed border-gray-200 dark:border-gray-700">
                     <div className="p-10 bg-gray-50 dark:bg-gray-900 inline-block rounded-full mb-8">
                         <MessageSquare size={80} className="text-gray-200 mx-auto" />
@@ -272,7 +364,7 @@ export default function AdmissionRequests() {
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pb-12 px-2">
-                    {filteredInquiries.map(inquiry => (
+                    {inquiries.map(inquiry => (
                         <AdmissionInquiryCard 
                             key={inquiry._id} 
                             inquiry={inquiry} 

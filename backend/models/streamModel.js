@@ -13,7 +13,7 @@ const semesterSchema = mongoose.Schema({
 
 const streamSchema = mongoose.Schema({
     name: { type: String, required: true },
-    level: { type: String, required: true, enum: ['Bachelors', 'Masters'] },
+    level: { type: String, required: true, enum: ['Bachelors', 'Masters', 'Diploma'] },
     duration: { type: String },
     description: { type: String },
     semesters: [semesterSchema]

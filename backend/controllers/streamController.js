@@ -1,5 +1,6 @@
 import Stream from '../models/streamModel.js';
 import mongoose from 'mongoose';
+import XLSX from 'xlsx';
 
 // --- Stream Controllers ---
 const getStreams = async (req, res) => {
@@ -47,6 +48,27 @@ const addStream = async (req, res) => {
         res.status(201).json(createdStream);
     } catch (error) {
         res.status(400).json({ message: 'Invalid data', error: error.message });
+    }
+};
+
+const exportStreams = async (req, res) => {
+    try {
+        const streams = await Stream.find({}).lean();
+        const rows = streams.map(s => ({
+            name: s.name,
+            level: s.level,
+            duration: s.duration,
+            description: s.description,
+            semesters: s.semesters?.length || 0,
+            subjects: s.semesters?.flatMap(sem => sem.subjects.map(sub => `${sem.semesterNumber}:${sub.code || ''}-${sub.name}`)).join('; ')
+        }));
+        const worksheet = XLSX.utils.json_to_sheet(rows);
+        const csv = XLSX.utils.sheet_to_csv(worksheet);
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', 'attachment; filename="streams.csv"');
+        res.status(200).send(csv);
+    } catch (error) {
+        res.status(500).json({ message: 'Export failed.' });
     }
 };
 
@@ -239,8 +261,50 @@ const getSubjectsForSemester = async (req, res) => {
     }
 };
 
+const importStreams = async (req, res) => {
+    try {
+        if (!req.file?.buffer) {
+            return res.status(400).json({ message: 'No file uploaded.' });
+        }
+        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+        const inserts = [];
+        const errors = [];
+
+        rows.forEach((row, index) => {
+            const name = row.name || row.Name;
+            const level = row.level || row.Level;
+            const durationYears = row.duration || row.Duration || 4;
+            const description = row.description || row.Description || '';
+
+            if (!name) {
+                errors.push({ row: index + 2, reason: 'Stream name is required.' });
+                return;
+            }
+
+            const totalSemesters = parseInt(durationYears) * 2;
+            const semesters = [];
+            for (let i = 1; i <= totalSemesters; i++) {
+                semesters.push({ semesterNumber: i, subjects: [] });
+            }
+
+            inserts.push({ name, level, duration: `${durationYears} Years`, description, semesters });
+        });
+
+        if (inserts.length > 0) {
+            await Stream.insertMany(inserts, { ordered: false });
+        }
+        res.status(201).json({ imported: inserts.length, errorCount: errors.length, errors });
+    } catch (error) {
+        res.status(400).json({ message: 'Import failed.', error: error.message });
+    }
+};
+
 export { 
     getStreams, getStreamByName, addStream, updateStream, deleteStream, 
     addSemester, deleteSemester,
-    addSubject, updateSubject, deleteSubject, getAllSubjects, getSubjectsForSemester
+    addSubject, updateSubject, deleteSubject, getAllSubjects, getSubjectsForSemester,
+    exportStreams, importStreams
 };

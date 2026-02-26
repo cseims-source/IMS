@@ -24,6 +24,7 @@ import reportRoutes from './routes/reportRoutes.js';
 import careerRoutes from './routes/careerRoutes.js';
 import admissionRoutes from './routes/admissionRoutes.js';
 import questionPaperRoutes from './routes/questionPaperRoutes.js';
+import examRoutes from './routes/examRoutes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -75,6 +76,7 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/career', careerRoutes);
 app.use('/api/admission', admissionRoutes);
 app.use('/api/question-papers', questionPaperRoutes);
+app.use('/api/exams', examRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

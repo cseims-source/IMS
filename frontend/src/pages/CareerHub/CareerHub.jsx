@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Loader2, Sparkles } from 'lucide-react';
+import { Send, Bot, User, Loader2, Sparkles, TrendingUp, Briefcase, ClipboardList, Target } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 const renderMessageContent = (text) => {
@@ -57,12 +57,28 @@ export default function CareerHub() {
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
+    const [metrics, setMetrics] = useState(null);
+    const [metricsLoading, setMetricsLoading] = useState(true);
     const { api } = useAuth();
     const chatContainerRef = useRef(null);
 
     useEffect(() => {
         chatContainerRef.current?.scrollTo(0, chatContainerRef.current.scrollHeight);
     }, [messages]);
+
+    useEffect(() => {
+        const fetchMetrics = async () => {
+            try {
+                const data = await api('/api/career/metrics');
+                setMetrics(data);
+            } catch (err) {
+                console.error(err);
+            } finally {
+                setMetricsLoading(false);
+            }
+        };
+        fetchMetrics();
+    }, [api]);
 
     const handleSend = async () => {
         if (!input.trim() || isLoading) return;
@@ -94,6 +110,45 @@ export default function CareerHub() {
             <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100 mb-4 flex items-center">
                 <Sparkles className="mr-3 text-primary-500" /> AI Career Counselor
             </h1>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700">
+                    <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-semibold text-gray-500">Average %</p>
+                        <TrendingUp className="text-primary-500" size={18} />
+                    </div>
+                    <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">
+                        {metricsLoading ? '—' : `${metrics?.avgPercentage ?? 0}%`}
+                    </p>
+                </div>
+                <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700">
+                    <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-semibold text-gray-500">Latest Exam</p>
+                        <ClipboardList className="text-secondary-500" size={18} />
+                    </div>
+                    <p className="text-lg font-bold text-gray-800 dark:text-gray-100">
+                        {metricsLoading ? '—' : (metrics?.latestExam || 'N/A')}
+                    </p>
+                    <p className="text-xs text-gray-400">Grade: {metricsLoading ? '—' : (metrics?.latestGrade || 'N/A')}</p>
+                </div>
+                <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700">
+                    <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-semibold text-gray-500">Applications</p>
+                        <Briefcase className="text-accent-500" size={18} />
+                    </div>
+                    <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">
+                        {metricsLoading ? '—' : (metrics?.applications ?? 0)}
+                    </p>
+                </div>
+                <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700">
+                    <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-semibold text-gray-500">Open Jobs</p>
+                        <Target className="text-green-500" size={18} />
+                    </div>
+                    <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">
+                        {metricsLoading ? '—' : (metrics?.openJobs ?? 0)}
+                    </p>
+                </div>
+            </div>
             <div ref={chatContainerRef} className="flex-grow overflow-y-auto pr-4 -mr-4 mb-4 border-b dark:border-gray-700 pb-4">
                 {messages.map((msg, index) => (
                     <ChatMessage key={index} message={msg.text} role={msg.role} />

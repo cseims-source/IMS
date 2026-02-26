@@ -3,6 +3,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import { ShoppingCart, Plus, Edit, Trash2, Utensils, ClipboardList, Settings, CheckCircle } from 'lucide-react';
 import { formatDateTime } from '../../utils/dateFormatter';
+import { handleExportWithNotification } from '../../utils/exportUtils';
 
 const categories = ['All', 'Snacks', 'Lunch', 'Beverages'];
 const orderStatuses = ['Pending', 'Preparing', 'Ready for Pickup', 'Completed', 'Cancelled'];
@@ -212,6 +213,8 @@ const AdminMenuTab = ({ menu, fetchMenu }) => {
     const { api } = useAuth();
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingItem, setEditingItem] = useState(null);
+    const [search, setSearch] = useState('');
+    const [category, setCategory] = useState('All');
 
     const handleAddItem = () => {
         setEditingItem(null);
@@ -238,11 +241,28 @@ const AdminMenuTab = ({ menu, fetchMenu }) => {
         fetchMenu();
     }
 
+    const filteredMenu = useMemo(() => {
+        return menu.filter(item => {
+            const matchCategory = category === 'All' || item.category === category;
+            const matchSearch = !search || item.name.toLowerCase().includes(search.toLowerCase());
+            return matchCategory && matchSearch;
+        });
+    }, [menu, category, search]);
+
     return (
         <div>
             <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-semibold">Menu Items</h2>
-                <button onClick={handleAddItem} className="flex items-center px-3 py-1.5 bg-primary-600 text-white rounded-md text-sm"><Plus size={16} className="mr-1"/>Add Item</button>
+                <div className="flex flex-wrap gap-2">
+                    <button onClick={() => handleExportWithNotification(addToast, '/api/canteen/items/export', 'canteen-menu', {}, 'csv')} className="flex items-center px-3 py-1.5 bg-gray-900 text-white rounded-md text-sm">Export Menu</button>
+                    <button onClick={handleAddItem} className="flex items-center px-3 py-1.5 bg-primary-600 text-white rounded-md text-sm"><Plus size={16} className="mr-1"/>Add Item</button>
+                </div>
+            </div>
+            <div className="flex flex-wrap gap-3 mb-4">
+                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search items" className="p-2 border rounded-md" />
+                <select value={category} onChange={(e) => setCategory(e.target.value)} className="p-2 border rounded-md">
+                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
             </div>
              <div className="overflow-x-auto">
                 <table className="w-full text-left">
@@ -255,7 +275,7 @@ const AdminMenuTab = ({ menu, fetchMenu }) => {
                         </tr>
                     </thead>
                     <tbody>
-                        {menu.map(item => (
+                        {filteredMenu.map(item => (
                             <tr key={item._id} className="border-b dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700/50">
                                 <td className="p-3">{item.name}</td>
                                 <td className="p-3">{item.category}</td>
@@ -280,11 +300,19 @@ const AdminOrdersTab = () => {
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [statusFilter, setStatusFilter] = useState('All');
+    const [stats, setStats] = useState(null);
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
 
     useEffect(() => {
         const fetchOrders = async () => {
             try {
-                const data = await api('/api/canteen/orders');
+                const params = new URLSearchParams({
+                    status: statusFilter,
+                    startDate: startDate || '',
+                    endDate: endDate || ''
+                });
+                const data = await api(`/api/canteen/orders?${params.toString()}`);
                 setOrders(data);
             } catch(err) {
                 console.error("Failed to fetch orders", err);
@@ -293,6 +321,18 @@ const AdminOrdersTab = () => {
             }
         };
         fetchOrders();
+    }, [api, statusFilter, startDate, endDate]);
+
+    useEffect(() => {
+        const fetchStats = async () => {
+            try {
+                const data = await api('/api/canteen/stats');
+                setStats(data);
+            } catch (err) {
+                setStats(null);
+            }
+        };
+        fetchStats();
     }, [api]);
 
     const handleStatusChange = async (orderId, newStatus) => {
@@ -316,12 +356,34 @@ const AdminOrdersTab = () => {
 
     return (
         <div>
-            <div className="flex justify-between items-center mb-4">
+            {stats && (
+                <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-4">
+                    {[
+                        { label: 'Total', value: stats.totalOrders },
+                        { label: 'Pending', value: stats.pending },
+                        { label: 'Preparing', value: stats.preparing },
+                        { label: 'Ready', value: stats.ready },
+                        { label: 'Completed', value: stats.completed },
+                        { label: 'Revenue', value: `₹${stats.revenue}` }
+                    ].map(item => (
+                        <div key={item.label} className="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-xl text-center">
+                            <p className="text-[0.6rem] font-black uppercase text-gray-400">{item.label}</p>
+                            <p className="text-lg font-black text-gray-900 dark:text-white">{item.value}</p>
+                        </div>
+                    ))}
+                </div>
+            )}
+            <div className="flex flex-wrap justify-between items-center mb-4 gap-3">
                 <h2 className="text-xl font-semibold">Manage Orders</h2>
-                <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="p-2 border rounded-md">
-                    <option>All</option>
-                    {orderStatuses.map(s => <option key={s}>{s}</option>)}
-                </select>
+                <div className="flex flex-wrap gap-2 items-center">
+                    <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="p-2 border rounded-md" />
+                    <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="p-2 border rounded-md" />
+                    <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="p-2 border rounded-md">
+                        <option>All</option>
+                        {orderStatuses.map(s => <option key={s}>{s}</option>)}
+                    </select>
+                    <button onClick={() => handleExportWithNotification(addToast, '/api/canteen/orders/export', 'canteen-orders', {}, 'csv')} className="px-3 py-2 bg-gray-900 text-white rounded-md text-sm">Export Orders</button>
+                </div>
             </div>
             <div className="overflow-x-auto">
                 <table className="w-full text-left">
@@ -357,6 +419,7 @@ const AdminOrdersTab = () => {
 
 export default function CanteenManagement() {
   const { user, api } = useAuth();
+  const { addToast } = useNotification();
   const [menu, setMenu] = useState([]);
   const [cart, setCart] = useState([]);
   const [filter, setFilter] = useState('All');

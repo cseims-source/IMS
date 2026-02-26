@@ -4,7 +4,7 @@ import {
     Users, Activity, FileDown, ArrowRight, Sparkles, 
     CheckCircle, TrendingUp, ShieldCheck, Clock, 
     ClipboardList, Wallet, UserPlus, Zap, BarChart3,
-    ArrowUpRight, Globe, Fingerprint
+    ArrowUpRight, Globe, Fingerprint, Briefcase
 } from 'lucide-react';
 import { formatDate } from '../utils/dateFormatter';
 import { Link } from 'react-router-dom';
@@ -40,21 +40,39 @@ const ShortcutBtn = ({ to, label, icon: Icon, color }) => (
     </Link>
 );
 
+const MiniStatCard = ({ label, value, icon: Icon, tone }) => (
+    <div className="p-6 bg-white dark:bg-gray-800 rounded-[2rem] border border-gray-100 dark:border-gray-700 flex items-center justify-between shadow-lg">
+        <div>
+            <p className="text-[0.6rem] font-black text-gray-400 uppercase tracking-[0.3em]">{label}</p>
+            <p className="text-2xl font-black text-gray-900 dark:text-white mt-1">{value}</p>
+        </div>
+        <div className={`p-3 rounded-2xl text-white ${tone}`}>
+            <Icon size={20} />
+        </div>
+    </div>
+);
+
 export default function Dashboard() {
   const { user, api } = useAuth();
   const [data, setData] = useState(null);
   const [charts, setCharts] = useState(null);
+    const [feesStats, setFeesStats] = useState(null);
+    const [careerMetrics, setCareerMetrics] = useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
     const fetchData = async () => {
         try {
-            const [stats, chartData] = await Promise.all([
+            const [stats, chartData, feesData, careerData] = await Promise.all([
                 api('/api/dashboard/stats'),
-                api('/api/dashboard/charts')
+                api('/api/dashboard/charts'),
+                api('/api/students/fees/stats'),
+                api('/api/career/metrics')
             ]);
             setData(stats);
             setCharts(chartData);
+            setFeesStats(feesData);
+            setCareerMetrics(careerData);
         } catch (err) { console.error(err); }
     };
     fetchData();
@@ -89,6 +107,27 @@ export default function Dashboard() {
             <StatCard title="Expert Faculty" value={data?.stats?.faculty || '0'} icon={<Fingerprint size={28} />} badge="Nodes: Healthy" trendColor="text-secondary-500 bg-secondary-500" delay={200} />
             <StatCard title="Infra Status" value="Online" icon={<Activity size={28} />} badge="69 active user sessions" trendColor="text-accent-500 bg-accent-500" delay={300} />
             <StatCard title="Bulletins" value={data?.stats?.notices || '0'} icon={<ClipboardList size={28} />} badge="Registry: Updated" trendColor="text-yellow-500 bg-yellow-500" delay={400} />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <MiniStatCard
+                label="Pending Fees"
+                value={feesStats?.pending ?? 0}
+                icon={Wallet}
+                tone="bg-secondary-500"
+            />
+            <MiniStatCard
+                label="Fees Collected"
+                value={`₹${feesStats?.paidAmount ?? 0}`}
+                icon={FileDown}
+                tone="bg-primary-600"
+            />
+            <MiniStatCard
+                label="Open Jobs"
+                value={careerMetrics?.openJobs ?? 0}
+                icon={Briefcase}
+                tone="bg-accent-500"
+            />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">

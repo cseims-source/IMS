@@ -3,7 +3,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { 
     User, KeyRound, CheckCircle, Fingerprint, Database, 
     Cpu, Mail, Smartphone, Briefcase, RefreshCw, Loader2, ShieldCheck, 
-    Lock, Save, ShieldAlert
+    Lock, Save, ShieldAlert, Bell, Moon, SlidersHorizontal
 } from 'lucide-react';
 import Spinner from '../../components/Spinner';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -41,6 +41,14 @@ export default function UserProfile() {
     const [facultyData, setFacultyData] = useState(null);
     const [activeTab, setActiveTab] = useState('DOSSIER');
     const [loading, setLoading] = useState(true);
+    const [preferences, setPreferences] = useState(() => {
+        try {
+            const saved = localStorage.getItem('userPreferences');
+            return saved ? JSON.parse(saved) : { emailAlerts: true, weeklyDigest: true, darkMode: false };
+        } catch {
+            return { emailAlerts: true, weeklyDigest: true, darkMode: false };
+        }
+    });
     
     // Security States
     const [passwords, setPasswords] = useState({ old: '', new: '', confirm: '' });
@@ -81,6 +89,11 @@ export default function UserProfile() {
         }
     };
 
+    const handleSavePreferences = () => {
+        localStorage.setItem('userPreferences', JSON.stringify(preferences));
+        addToast('Preferences updated.', 'success');
+    };
+
     if (loading) return <div className="h-[50vh] flex items-center justify-center"><Spinner size="lg" /></div>;
     
     const photoUrl = facultyData?.photo || `https://api.dicebear.com/8.x/initials/svg?seed=${user?.name}`;
@@ -113,6 +126,7 @@ export default function UserProfile() {
             <div className="flex flex-wrap gap-4 justify-center md:justify-start">
                 <TabButton active={activeTab === 'DOSSIER'} onClick={() => setActiveTab('DOSSIER')} icon={Briefcase} label="Institutional Dossier" />
                 <TabButton active={activeTab === 'SECURITY'} onClick={() => setActiveTab('SECURITY')} icon={Lock} label="Security Rotation" />
+                <TabButton active={activeTab === 'PREFERENCES'} onClick={() => setActiveTab('PREFERENCES')} icon={SlidersHorizontal} label="Preferences" />
             </div>
 
             <div className="animate-fade-in-up">
@@ -221,6 +235,64 @@ export default function UserProfile() {
                                 <p className="text-[0.55rem] font-bold text-yellow-700 dark:text-yellow-400 uppercase tracking-widest leading-relaxed">Safety Note: Changing your password will invalidate existing session tokens on other devices.</p>
                             </div>
                         </form>
+                    </div>
+                )}
+
+                {activeTab === 'PREFERENCES' && (
+                    <div className="max-w-2xl mx-auto space-y-8 animate-fade-in">
+                        <div className="text-center">
+                            <div className="w-20 h-20 bg-primary-100 dark:bg-primary-900/30 rounded-[2.5rem] flex items-center justify-center mx-auto text-primary-600 shadow-inner">
+                                <SlidersHorizontal size={40} />
+                            </div>
+                            <h2 className="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tighter mt-4">Preferences</h2>
+                            <p className="text-[0.65rem] text-gray-500 font-bold uppercase tracking-[0.3em]">Personalize your workspace</p>
+                        </div>
+
+                        <div className="bg-white dark:bg-gray-900 p-10 rounded-[3.5rem] shadow-2xl border border-gray-100 dark:border-gray-800 space-y-6">
+                            <label className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl">
+                                <div className="flex items-center gap-3">
+                                    <Bell className="text-primary-500" size={18} />
+                                    <span className="text-xs font-bold text-gray-700 dark:text-gray-200 uppercase tracking-widest">Email Alerts</span>
+                                </div>
+                                <input
+                                    type="checkbox"
+                                    checked={preferences.emailAlerts}
+                                    onChange={(e) => setPreferences(prev => ({ ...prev, emailAlerts: e.target.checked }))}
+                                    className="h-5 w-5 accent-primary-600"
+                                />
+                            </label>
+                            <label className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl">
+                                <div className="flex items-center gap-3">
+                                    <CheckCircle className="text-secondary-500" size={18} />
+                                    <span className="text-xs font-bold text-gray-700 dark:text-gray-200 uppercase tracking-widest">Weekly Digest</span>
+                                </div>
+                                <input
+                                    type="checkbox"
+                                    checked={preferences.weeklyDigest}
+                                    onChange={(e) => setPreferences(prev => ({ ...prev, weeklyDigest: e.target.checked }))}
+                                    className="h-5 w-5 accent-secondary-500"
+                                />
+                            </label>
+                            <label className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl">
+                                <div className="flex items-center gap-3">
+                                    <Moon className="text-accent-500" size={18} />
+                                    <span className="text-xs font-bold text-gray-700 dark:text-gray-200 uppercase tracking-widest">Prefer Dark Mode</span>
+                                </div>
+                                <input
+                                    type="checkbox"
+                                    checked={preferences.darkMode}
+                                    onChange={(e) => setPreferences(prev => ({ ...prev, darkMode: e.target.checked }))}
+                                    className="h-5 w-5 accent-accent-500"
+                                />
+                            </label>
+
+                            <button
+                                onClick={handleSavePreferences}
+                                className="w-full py-4 bg-primary-600 text-white font-black uppercase text-[0.65rem] tracking-[0.3em] rounded-2xl shadow-xl shadow-primary-500/30 hover:bg-primary-700 active:scale-95 transition-all flex items-center justify-center gap-3"
+                            >
+                                <Save size={18} /> Save Preferences
+                            </button>
+                        </div>
                     </div>
                 )}
             </div>

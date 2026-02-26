@@ -4,6 +4,7 @@ const questionPaperSchema = mongoose.Schema({
     title: { type: String, required: true },
     course: { type: String, required: true },
     branch: { type: String, required: true },
+    streamId: { type: mongoose.Schema.Types.ObjectId, ref: 'Stream' },
     semester: { type: Number, required: true },
     subject: { type: String, required: true },
     academicYear: { type: String, required: true },

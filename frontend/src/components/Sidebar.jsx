@@ -56,7 +56,8 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
     { section: 'Academic Management', items: [
         { icon: <HardDrive size={18} />, name: 'Question Bank', path: '/app/question-bank' },
         { icon: <BookOpen size={18} />, name: 'Curriculum Plan', path: '/app/streams' },
-        { icon: <Percent size={18} />, name: 'Examinations', path: '/app/marksheet' },
+      { icon: <Percent size={18} />, name: 'Marks Entry', path: '/app/marksheet' },
+      { icon: <CalendarDays size={18} />, name: 'Exam Scheduler', path: '/app/exam-scheduler' },
         { icon: <CalendarCheck size={18} />, name: 'Attendance Hub', path: '/app/attendance' },
         { icon: <CalendarDays size={18} />, name: 'Timetables', path: '/app/timetable' },
     ]},
@@ -79,7 +80,8 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
     { section: 'Core Functions', items: [
         { icon: <HardDrive size={18} />, name: 'Question Bank', path: '/app/question-bank' },
         { icon: <Users size={18} />, name: 'Student Registry', path: '/app/student-admission' },
-        { icon: <Percent size={18} />, name: 'Marks Entry', path: '/app/marksheet' },
+      { icon: <Percent size={18} />, name: 'Marks Entry', path: '/app/marksheet' },
+      { icon: <CalendarDays size={18} />, name: 'Exam Scheduler', path: '/app/exam-scheduler' },
         { icon: <CalendarCheck size={18} />, name: 'Mark Attendance', path: '/app/attendance' },
     ]},
     { section: 'Academic Tools', items: [
@@ -92,6 +94,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
   const studentLinks = [
     { section: 'Academic Hub', items: [
         { icon: <LayoutDashboard size={18} />, name: 'My Progress', path: '/app/my-profile' },
+        { icon: <BarChart size={18} />, name: 'Attendance Analytics', path: '/app/attendance-analytics' },
         { icon: <HardDrive size={18} />, name: 'Papers Hub', path: '/app/question-bank' },
         { icon: <CalendarDays size={18} />, name: 'Daily Timetable', path: '/app/timetable' },
         { icon: <Percent size={18} />, name: 'Results Hub', path: '/app/marksheet' },
@@ -99,7 +102,8 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
     { section: 'Digital Campus', items: [
         { icon: <Sparkles size={18} />, name: 'Career Hub', path: '/app/career-hub' },
         { icon: <Utensils size={18} />, name: 'Smart Canteen', path: '/app/canteen' },
-        { icon: <Library size={18} />, name: 'Digital Library', path: '/app/library' },
+      { icon: <Library size={18} />, name: 'Digital Library', path: '/app/library' },
+      { icon: <Bus size={18} />, name: 'Transport Fleet', path: '/app/transport' },
         { icon: <ClipboardList size={18} />, name: 'Bulletin Board', path: '/app/notice-board' },
     ]}
   ];

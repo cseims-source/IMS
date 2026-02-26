@@ -31,13 +31,15 @@ const getTimetable = async (req, res) => {
     try {
         const { streamName, semester } = req.params;
         const semesterNum = parseInt(semester, 10);
+        const streamDoc = await Stream.findOne({ name: streamName }).select('_id').lean();
+        const streamId = streamDoc?._id || null;
         
         let timetable = await Timetable.findOne({ stream: streamName, semester: semesterNum });
         
         if (!timetable) {
             // If no timetable exists, create a default one and save it
             const defaultSchedule = defaultSchedules[streamName]?.[semesterNum] || {};
-            timetable = new Timetable({ stream: streamName, semester: semesterNum, schedule: defaultSchedule });
+            timetable = new Timetable({ stream: streamName, ...(streamId ? { streamId } : {}), semester: semesterNum, schedule: defaultSchedule });
             await timetable.save();
         }
 
@@ -53,10 +55,12 @@ const updateTimetable = async (req, res) => {
         const { streamName, semester } = req.params;
         const semesterNum = parseInt(semester, 10);
         const { schedule } = req.body;
+        const streamDoc = await Stream.findOne({ name: streamName }).select('_id').lean();
+        const streamId = streamDoc?._id || null;
         
         const timetable = await Timetable.findOneAndUpdate(
             { stream: streamName, semester: semesterNum },
-            { schedule: schedule },
+            { schedule: schedule, ...(streamId ? { streamId } : {}) },
             { new: true, upsert: true }
         );
 
@@ -168,8 +172,15 @@ const getTeacherScheduleByDate = async (req, res) => {
         const dateObj = new Date(date);
         const dayName = daysOfWeek[dateObj.getDay()];
 
+        const assignedStreamIds = teacher.assignedStreamIds?.length
+            ? teacher.assignedStreamIds
+            : [...new Set((teacher.workload || []).map(w => w.streamId).filter(Boolean))];
+        const assignedStreams = teacher.assignedStreams || [];
+
         // Find all timetables for streams this teacher is assigned to
-        const timetables = await Timetable.find({ stream: { $in: teacher.assignedStreams } });
+        const timetables = assignedStreamIds.length > 0
+            ? await Timetable.find({ streamId: { $in: assignedStreamIds } })
+            : await Timetable.find({ stream: { $in: assignedStreams } });
         
         let dailyClasses = [];
 

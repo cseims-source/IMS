@@ -119,6 +119,8 @@ const AttendanceModal = ({ attendance, onClose }) => {
                                     </div>
                                     {record.status === 'present' ? (
                                         <span className="px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300">Present</span>
+                                    ) : record.status === 'late' ? (
+                                        <span className="px-3 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">Late</span>
                                     ) : (
                                         <span className="px-3 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300">Absent</span>
                                     )}
@@ -172,7 +174,7 @@ export default function ViewStudentProfile() {
     if (!attendance) return { overall: '0', total: 0 };
     const totalDays = attendance.length;
     if (totalDays === 0) return { overall: 'N/A', total: 0 };
-    const presentDays = attendance.filter(a => a.status === 'present').length;
+    const presentDays = attendance.filter(a => a.status === 'present' || a.status === 'late').length;
     const percentage = ((presentDays / totalDays) * 100).toFixed(1);
     return { overall: percentage, total: totalDays };
   }, [attendance]);

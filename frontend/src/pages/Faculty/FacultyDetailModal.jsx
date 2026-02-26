@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { X, Printer, Fingerprint, Database, Cpu, Mail, Smartphone, Layers, GraduationCap, ShieldCheck, UserCheck, Briefcase, MapPin, Calendar, Clock, UserCog } from 'lucide-react';
 import { formatDate } from '../../utils/dateFormatter';
+import { normalizePhotoUrl } from '../../utils/photoUtils';
 
 const InfoBit = ({ label, value, icon: Icon, color = "text-primary-500" }) => (
     <div className="flex items-start text-gray-600 dark:text-gray-300 p-5 bg-white dark:bg-gray-900/50 rounded-[2rem] border border-gray-100 dark:border-gray-800 hover:shadow-xl transition-all group">
@@ -24,7 +25,7 @@ export default function FacultyDetailModal({ faculty, onClose }) {
 
     if (!faculty) return null;
 
-    const photoUrl = faculty.photo || `https://api.dicebear.com/8.x/initials/svg?seed=${faculty.name}`;
+    const photoUrl = normalizePhotoUrl(faculty.photo) || `https://api.dicebear.com/8.x/initials/svg?seed=${faculty.name}`;
 
     return (
         <div className="fixed inset-0 bg-gray-950/95 backdrop-blur-3xl flex justify-center items-center z-[250] p-4 print:p-0 print:bg-white print:static print:inset-auto">
@@ -55,7 +56,14 @@ export default function FacultyDetailModal({ faculty, onClose }) {
                         </div>
                         <div className="relative">
                             <div className="w-48 h-48 rounded-[4rem] bg-gray-50 dark:bg-gray-800 border-8 border-white dark:border-gray-700 shadow-3xl overflow-hidden relative group print:w-32 print:h-32">
-                                <img src={photoUrl} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" />
+                                <img
+                                    src={photoUrl}
+                                    onError={(e) => {
+                                        e.currentTarget.onerror = null;
+                                        e.currentTarget.src = `https://api.dicebear.com/8.x/initials/svg?seed=${faculty.name}`;
+                                    }}
+                                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000"
+                                />
                             </div>
                             <div className="absolute -bottom-2 -right-2 bg-primary-600 text-white p-3 rounded-2xl shadow-2xl border-4 border-white dark:border-gray-950 animate-float print:hidden">
                                 <UserCheck size={20} />
@@ -85,13 +93,27 @@ export default function FacultyDetailModal({ faculty, onClose }) {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
                         <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6">
-                            <InfoBit icon={Mail} label="Institutional Protocol (Email)" value={faculty.email} color="text-indigo-500" />
-                            <InfoBit icon={Smartphone} label="Direct Lattice Link" value={faculty.phone} color="text-accent-500" />
+                            <InfoBit icon={Mail} label="E-mail ID" value={faculty.email} color="text-indigo-500" />
+                            <InfoBit icon={ShieldCheck} label="Staff Type" value={faculty.staffType} color="text-primary-500" />
+                            <InfoBit icon={Smartphone} label="Contact No" value={faculty.phone} color="text-accent-500" />
+                            <InfoBit icon={Smartphone} label="WhatsApp No" value={faculty.whatsappNo} color="text-accent-500" />
+                            <InfoBit icon={UserCheck} label="Username" value={faculty.username} color="text-primary-500" />
+                            <InfoBit icon={UserCheck} label="Father's Name" value={faculty.fatherName} color="text-primary-500" />
+                            <InfoBit icon={UserCheck} label="Mother's Name" value={faculty.motherName} color="text-primary-500" />
+                            <InfoBit icon={GraduationCap} label="Highest Qualification" value={faculty.highestQualification || faculty.qualification} color="text-secondary-500" />
+                            <InfoBit icon={Briefcase} label="Teacher ID (BPUT)" value={faculty.teacherId} color="text-secondary-500" />
+                            <InfoBit icon={Calendar} label="Date of Joining (D.O.J.)" value={formatDate(faculty.joiningDate)} color="text-green-500" />
+                            <InfoBit icon={Calendar} label="Date of Birth (D.O.B.)" value={formatDate(faculty.dateOfBirth)} color="text-green-500" />
+                            <InfoBit icon={Calendar} label="Date of Leave" value={formatDate(faculty.dateOfLeave)} color="text-green-500" />
+                            <InfoBit icon={Briefcase} label="Caste" value={faculty.caste} color="text-secondary-500" />
+                            <InfoBit icon={ShieldCheck} label="Blood Group" value={faculty.bloodGroup} color="text-red-500" />
+                            <InfoBit icon={UserCog} label="Religion" value={faculty.religion} color="text-red-500" />
+                            <InfoBit icon={Fingerprint} label="Aadhar Card No" value={faculty.aadharNo} color="text-primary-500" />
+                            <InfoBit icon={Fingerprint} label="PAN Card No" value={faculty.panNo} color="text-primary-500" />
+                            <InfoBit icon={MapPin} label="Present Address" value={faculty.address?.current} color="text-red-500" />
                             <div className="sm:col-span-2">
-                                <InfoBit icon={GraduationCap} label="Academic Credentials & Bio" value={faculty.qualification} color="text-secondary-500" />
+                                <InfoBit icon={MapPin} label="Permanent Address" value={faculty.address?.permanent} color="text-red-500" />
                             </div>
-                            <InfoBit icon={Calendar} label="Sequence Activation Date" value={formatDate(faculty.joiningDate)} color="text-green-500" />
-                            <InfoBit icon={MapPin} label="Spatial Coordinate" value={faculty.address?.current} color="text-red-500" />
                         </div>
 
                         <div className="bg-gray-50 dark:bg-gray-900/50 p-8 rounded-[3.5rem] border border-gray-100 dark:border-gray-800 flex flex-col gap-8 shadow-inner print:border-none print:shadow-none">

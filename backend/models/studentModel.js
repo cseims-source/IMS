@@ -28,6 +28,7 @@ const studentSchema = mongoose.Schema({
     admissionDate: { type: Date },
     currentSemester: { type: Number, default: 1 },
     stream: { type: String, default: 'Unassigned' },
+    streamId: { type: mongoose.Schema.Types.ObjectId, ref: 'Stream' },
 
     // 4. Entrance & Identification
     appearedInEntrance: { type: String, default: 'No' },
@@ -114,6 +115,14 @@ const studentSchema = mongoose.Schema({
     },
 
     // 11. Fee Information
+    fees: [
+        {
+            type: { type: String, default: 'Tuition' },
+            amount: { type: Number, default: 0 },
+            status: { type: String, enum: ['Pending', 'Paid'], default: 'Pending' },
+            dueDate: { type: Date }
+        }
+    ],
     paymentPattern: { type: String },
     yearFees: {
         y1: { type: Number, default: 0 },

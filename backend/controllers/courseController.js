@@ -1,4 +1,5 @@
 import Course from '../models/courseModel.js';
+import XLSX from 'xlsx';
 
 // --- Course Controllers ---
 const getCourses = async (req, res) => {
@@ -132,4 +133,59 @@ const getAllSubjects = async (req, res) => {
     }
 };
 
-export { getCourses, getCourseByName, addCourse, updateCourse, deleteCourse, addSubject, updateSubject, deleteSubject, getAllSubjects };
+const exportCourses = async (req, res) => {
+    try {
+        const courses = await Course.find({}).lean();
+        const rows = courses.map(c => ({
+            name: c.name,
+            duration: c.duration,
+            credits: c.credits,
+            description: c.description,
+            subjects: c.subjects?.map(s => `${s.code} - ${s.name}`).join('; ')
+        }));
+        const worksheet = XLSX.utils.json_to_sheet(rows);
+        const csv = XLSX.utils.sheet_to_csv(worksheet);
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', 'attachment; filename="courses.csv"');
+        res.status(200).send(csv);
+    } catch (error) {
+        res.status(500).json({ message: 'Export failed.' });
+    }
+};
+
+const importCourses = async (req, res) => {
+    try {
+        if (!req.file?.buffer) {
+            return res.status(400).json({ message: 'No file uploaded.' });
+        }
+        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+        const inserts = [];
+        const errors = [];
+
+        rows.forEach((row, index) => {
+            const name = row.name || row.Name;
+            const duration = row.duration || row.Duration || 4;
+            const credits = row.credits || row.Credits || 0;
+            const description = row.description || row.Description || '';
+
+            if (!name) {
+                errors.push({ row: index + 2, reason: 'Course name is required.' });
+                return;
+            }
+
+            inserts.push({ name, duration, credits, description, subjects: [] });
+        });
+
+        if (inserts.length > 0) {
+            await Course.insertMany(inserts, { ordered: false });
+        }
+        res.status(201).json({ imported: inserts.length, errorCount: errors.length, errors });
+    } catch (error) {
+        res.status(400).json({ message: 'Import failed.', error: error.message });
+    }
+};
+
+export { getCourses, getCourseByName, addCourse, updateCourse, deleteCourse, addSubject, updateSubject, deleteSubject, getAllSubjects, exportCourses, importCourses };

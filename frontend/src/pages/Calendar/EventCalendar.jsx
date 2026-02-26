@@ -1,13 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { ChevronLeft, ChevronRight, Plus, X } from 'lucide-react';
-
-const mockEvents = {
-  '2024-10-05': [{ title: 'Annual Sports Day', category: 'Event' }],
-  '2024-09-20': [{ title: 'Library Maintenance', category: 'Administrative' }],
-  '2024-09-28': [{ title: 'Mid-Term Math Exam', category: 'Academic' }, { title: 'Mid-Term Science Exam', category: 'Academic' }],
-};
 
 const categoryColors = {
     Academic: 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300',
@@ -54,11 +48,24 @@ const AddEventModal = ({ onSave, onCancel, date }) => {
 };
 
 export default function EventCalendar() {
-  const { user } = useAuth();
-  const [currentDate, setCurrentDate] = useState(new Date(2024, 8, 1)); // Start with Sep 2024
-  const [events, setEvents] = useState(mockEvents);
+  const { user, api } = useAuth();
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [events, setEvents] = useState({});
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(null);
+
+  useEffect(() => {
+    fetchEvents();
+  }, [api]);
+
+  const fetchEvents = async () => {
+    try {
+      const data = await api('/api/events');
+      setEvents(data);
+    } catch (error) {
+      console.error('Failed to fetch events', error);
+    }
+  };
 
   const month = currentDate.getMonth();
   const year = currentDate.getFullYear();
@@ -76,14 +83,19 @@ export default function EventCalendar() {
     }
   };
 
-  const saveEvent = (eventData) => {
+  const saveEvent = async (eventData) => {
     const dateString = selectedDate.toISOString().split('T')[0];
-    setEvents(prev => ({
-        ...prev,
-        [dateString]: [...(prev[dateString] || []), eventData]
-    }));
-    setIsModalOpen(false);
-    setSelectedDate(null);
+    try {
+      await api('/api/events', {
+        method: 'POST',
+        body: JSON.stringify({ ...eventData, date: dateString })
+      });
+      setIsModalOpen(false);
+      setSelectedDate(null);
+      fetchEvents();
+    } catch (error) {
+      console.error('Failed to save event', error);
+    }
   };
   
   const today = new Date();
@@ -93,6 +105,9 @@ export default function EventCalendar() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800">Event Calendar</h1>
         <div className="flex items-center gap-4">
+          {user?.role === 'Admin' && (
+            <button onClick={() => window.open('/api/events/export', '_blank')} className="px-3 py-2 bg-gray-900 text-white rounded-md text-sm">Export</button>
+          )}
           <button onClick={() => changeMonth(-1)} className="p-2 rounded-full hover:bg-gray-100"><ChevronLeft/></button>
           <h2 className="text-xl font-semibold w-36 text-center">{currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}</h2>
           <button onClick={() => changeMonth(1)} className="p-2 rounded-full hover:bg-gray-100"><ChevronRight/></button>

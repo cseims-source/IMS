@@ -52,11 +52,17 @@ export default function EventCalendar() {
   const { user, api } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [events, setEvents] = useState({});
+  const [eventList, setEventList] = useState([]);
+  const [stats, setStats] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(null);
 
   useEffect(() => {
     fetchEvents();
+    if (user?.role === 'Admin') {
+        fetchEventList();
+        fetchStats();
+    }
   }, [api]);
 
   const fetchEvents = async () => {
@@ -65,6 +71,24 @@ export default function EventCalendar() {
       setEvents(data);
     } catch (error) {
       console.error("Failed to fetch events", error);
+    }
+  };
+
+  const fetchEventList = async () => {
+    try {
+        const data = await api('/api/events?format=flat');
+        setEventList(data);
+    } catch (error) {
+        console.error("Failed to fetch event list", error);
+    }
+  };
+
+  const fetchStats = async () => {
+    try {
+        const data = await api('/api/events/stats');
+        setStats(data);
+    } catch (error) {
+        setStats(null);
     }
   };
 
@@ -94,9 +118,19 @@ export default function EventCalendar() {
       setIsModalOpen(false);
       setSelectedDate(null);
       fetchEvents();
+      fetchEventList();
+      fetchStats();
     } catch (error) {
       console.error("Failed to save event", error);
     }
+  };
+
+  const deleteEvent = async (id) => {
+    if (!window.confirm('Delete this event?')) return;
+    await api(`/api/events/${id}`, { method: 'DELETE' });
+    fetchEvents();
+    fetchEventList();
+    fetchStats();
   };
   
   const today = new Date();
@@ -111,6 +145,39 @@ export default function EventCalendar() {
           <button onClick={() => changeMonth(1)} className="p-2 rounded-full hover:bg-gray-100"><ChevronRight/></button>
         </div>
       </div>
+
+      {user?.role === 'Admin' && (
+      <div className="mb-6 space-y-4">
+        {stats && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-gray-50 p-4 rounded-xl text-center">
+              <p className="text-[0.6rem] font-black uppercase text-gray-400">Total Events</p>
+              <p className="text-2xl font-black text-gray-900">{stats.total}</p>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-xl text-center">
+              <p className="text-[0.6rem] font-black uppercase text-gray-400">Upcoming</p>
+              <p className="text-2xl font-black text-gray-900">{stats.upcoming}</p>
+            </div>
+            <button onClick={() => window.open('/api/events/export', '_blank')} className="col-span-2 md:col-span-1 px-4 py-2 bg-gray-900 text-white rounded-xl">Export</button>
+          </div>
+        )}
+        <div className="bg-gray-50 rounded-xl p-4">
+          <h3 className="font-semibold mb-3">Event Registry</h3>
+          {eventList.length === 0 ? (
+            <p className="text-sm text-gray-500">No events logged.</p>
+          ) : (
+            <div className="max-h-48 overflow-y-auto space-y-2">
+              {eventList.map(e => (
+                <div key={e._id} className="flex justify-between items-center text-sm bg-white p-2 rounded">
+                  <span>{formatDate(e.date)} • {e.title} ({e.category})</span>
+                  <button onClick={() => deleteEvent(e._id)} className="text-red-600">Delete</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+      )}
 
       <div className="grid grid-cols-7 gap-1 text-center font-semibold text-sm text-gray-600 mb-2">
         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => <div key={day}>{day}</div>)}

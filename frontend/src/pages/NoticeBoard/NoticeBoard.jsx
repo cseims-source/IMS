@@ -67,20 +67,39 @@ export default function NoticeBoard() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [confirmAction, setConfirmAction] = useState(null);
+    const [stats, setStats] = useState(null);
+    const [search, setSearch] = useState('');
+    const [categoryFilter, setCategoryFilter] = useState('All');
+    const [priorityFilter, setPriorityFilter] = useState('All');
 
-  useEffect(() => {
-    fetchNotices();
-  }, [api]);
+    useEffect(() => {
+        fetchNotices();
+        if (user?.role === 'Admin') fetchStats();
+    }, [api, user?.role]);
 
   const fetchNotices = async () => {
       setLoading(true);
       try {
-        const data = await api('/api/notices');
+        const params = new URLSearchParams({
+            search,
+            category: categoryFilter,
+            priority: priorityFilter
+        });
+        const data = await api(`/api/notices?${params.toString()}`);
         setNotices(data);
       } catch (error) {
           console.error("Failed to fetch notices", error);
       } finally {
           setLoading(false);
+      }
+  };
+
+  const fetchStats = async () => {
+      try {
+          const data = await api('/api/notices/stats');
+          setStats(data);
+      } catch (error) {
+          setStats(null);
       }
   };
   
@@ -132,10 +151,41 @@ export default function NoticeBoard() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100">Digital Notice Board</h1>
         {user?.role === 'Admin' && (
-            <button onClick={handleAddClick} className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition">
-                <Plus size={20} className="mr-2" /> Create Notice
-            </button>
+            <div className="flex gap-2">
+                <button onClick={() => window.open('/api/notices/export', '_blank')} className="px-4 py-2 bg-gray-900 text-white rounded-lg">Export</button>
+                <button onClick={handleAddClick} className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition">
+                    <Plus size={20} className="mr-2" /> Create Notice
+                </button>
+            </div>
         )}
+      </div>
+
+      {stats && user?.role === 'Admin' && (
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+            {[
+                { label: 'Total', value: stats.total },
+                { label: 'High', value: stats.high },
+                { label: 'Medium', value: stats.medium },
+                { label: 'Low', value: stats.low },
+                { label: 'Last 7 Days', value: stats.last7 }
+            ].map(item => (
+                <div key={item.label} className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl text-center">
+                    <p className="text-[0.6rem] font-black uppercase text-gray-400">{item.label}</p>
+                    <p className="text-2xl font-black text-gray-900 dark:text-white">{item.value}</p>
+                </div>
+            ))}
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-3 mb-6">
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search notices" className="p-2 border rounded-md" />
+        <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="p-2 border rounded-md">
+            <option>All</option><option>Academic</option><option>Administrative</option><option>Event</option>
+        </select>
+        <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)} className="p-2 border rounded-md">
+            <option>All</option><option>High</option><option>Medium</option><option>Low</option>
+        </select>
+        <button onClick={fetchNotices} className="px-3 py-2 bg-primary-600 text-white rounded-md">Apply</button>
       </div>
 
       {loading ? <div className="text-center p-8">Loading notices...</div> : (

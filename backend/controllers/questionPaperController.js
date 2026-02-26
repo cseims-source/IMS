@@ -1,6 +1,7 @@
 import QuestionPaper from '../models/questionPaperModel.js';
 import Stream from '../models/streamModel.js';
 import { GoogleGenAI, Type } from '@google/genai';
+import XLSX from 'xlsx';
 
 export const getQuestionPapers = async (req, res) => {
     try {
@@ -63,8 +64,13 @@ export const getQuestionPaperMetadata = async (req, res) => {
 
 export const addQuestionPaper = async (req, res) => {
     try {
+        const streamName = req.body.branch || req.body.course;
+        const streamDoc = streamName
+            ? await Stream.findOne({ name: streamName }).select('_id').lean()
+            : null;
         const paper = new QuestionPaper({
             ...req.body,
+            ...(streamDoc?._id ? { streamId: streamDoc._id } : {}),
             uploadedBy: req.user._id
         });
         const created = await paper.save();
@@ -122,5 +128,85 @@ export const generateAIQuestions = async (req, res) => {
         res.json(JSON.parse(response.text));
     } catch (error) {
         res.status(500).json({ message: 'AI Synthesis Interrupted' });
+    }
+};
+
+export const exportQuestionPapers = async (req, res) => {
+    try {
+        const papers = await QuestionPaper.find({}).lean();
+        const rows = papers.map(p => ({
+            title: p.title,
+            course: p.course,
+            branch: p.branch,
+            semester: p.semester,
+            subject: p.subject,
+            academicYear: p.academicYear,
+            difficulty: p.difficulty,
+            fileUrl: p.fileUrl || ''
+        }));
+        const worksheet = XLSX.utils.json_to_sheet(rows);
+        const csv = XLSX.utils.sheet_to_csv(worksheet);
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', 'attachment; filename="question-papers.csv"');
+        res.status(200).send(csv);
+    } catch (error) {
+        res.status(500).json({ message: 'Export failed.' });
+    }
+};
+
+export const importQuestionPapers = async (req, res) => {
+    try {
+        if (!req.file?.buffer) {
+            return res.status(400).json({ message: 'No file uploaded.' });
+        }
+        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+        const errors = [];
+        const inserts = [];
+
+        for (const [index, row] of rows.entries()) {
+            const rowIndex = index + 2;
+            const title = row.title || row.Title;
+            const course = row.course || row.Course;
+            const branch = row.branch || row.Branch;
+            const semester = parseInt(row.semester || row.Semester, 10);
+            const subject = row.subject || row.Subject;
+            const academicYear = row.academicYear || row.AcademicYear || row.academic_year;
+            const difficulty = row.difficulty || row.Difficulty || 'Medium';
+            const fileUrl = row.fileUrl || row.FileUrl || row.file_url || '';
+
+            if (!title || !course || !branch || !semester || !subject || !academicYear) {
+                errors.push({ row: rowIndex, reason: 'Missing required fields.' });
+                continue;
+            }
+
+            const streamName = branch || course;
+            const streamDoc = streamName
+                ? await Stream.findOne({ name: streamName }).select('_id').lean()
+                : null;
+
+            inserts.push({
+                title,
+                course,
+                branch,
+                semester,
+                subject,
+                academicYear,
+                difficulty,
+                fileUrl,
+                ...(streamDoc?._id ? { streamId: streamDoc._id } : {}),
+                uploadedBy: req.user._id
+            });
+        }
+
+        if (inserts.length > 0) {
+            await QuestionPaper.insertMany(inserts, { ordered: false });
+        }
+
+        res.status(201).json({ imported: inserts.length, errorCount: errors.length, errors });
+    } catch (error) {
+        res.status(400).json({ message: 'Import failed.', error: error.message });
     }
 };

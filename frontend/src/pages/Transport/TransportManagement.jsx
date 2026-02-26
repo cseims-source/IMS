@@ -97,12 +97,14 @@ const AllocationForm = ({ students, routes, onSave, onCancel }) => {
 
 export default function TransportManagement() {
     const [activeTab, setActiveTab] = useState('vehicles');
-    const { api } = useAuth();
+    const { api, user } = useAuth();
+    const isAdmin = user?.role === 'Admin';
 
     const [vehicles, setVehicles] = useState([]);
     const [routes, setRoutes] = useState([]);
     const [allocations, setAllocations] = useState([]);
     const [students, setStudents] = useState([]);
+    const [myAllocation, setMyAllocation] = useState(null);
 
     const [isVehicleFormOpen, setIsVehicleFormOpen] = useState(false);
     const [editingVehicle, setEditingVehicle] = useState(null);
@@ -111,23 +113,33 @@ export default function TransportManagement() {
     const [editingRoute, setEditingRoute] = useState(null);
 
     const [isAllocationFormOpen, setIsAllocationFormOpen] = useState(false);
+    const [importFile, setImportFile] = useState(null);
 
     const fetchData = useCallback(async () => {
         try {
-            const [vehiclesData, routesData, allocationsData, studentsData] = await Promise.all([
-                api('/api/transport/vehicles'),
-                api('/api/transport/routes'),
-                api('/api/transport/allocations'),
-                api('/api/students'),
-            ]);
-            setVehicles(vehiclesData);
-            setRoutes(routesData);
-            setAllocations(allocationsData);
-            setStudents(studentsData);
+            if (isAdmin) {
+                const [vehiclesData, routesData, allocationsData, studentsData] = await Promise.all([
+                    api('/api/transport/vehicles'),
+                    api('/api/transport/routes'),
+                    api('/api/transport/allocations'),
+                    api('/api/students'),
+                ]);
+                setVehicles(vehiclesData);
+                setRoutes(routesData);
+                setAllocations(allocationsData);
+                setStudents(studentsData);
+            } else {
+                const [routesData, allocationData] = await Promise.all([
+                    api('/api/transport/routes'),
+                    api('/api/transport/my-allocation')
+                ]);
+                setRoutes(routesData);
+                setMyAllocation(allocationData);
+            }
         } catch (error) {
             console.error("Failed to fetch transport data", error);
         }
-    }, [api]);
+    }, [api, isAdmin]);
 
     useEffect(() => {
         fetchData();
@@ -147,6 +159,15 @@ export default function TransportManagement() {
             fetchData();
         }
     };
+
+    const handleImportAllocations = async () => {
+        if (!importFile) return alert('Select a file first.');
+        const formData = new FormData();
+        formData.append('file', importFile);
+        await api('/api/transport/allocations/import', { method: 'POST', body: formData });
+        setImportFile(null);
+        fetchData();
+    };
     
     // UI rendering logic
     const renderContent = () => {
@@ -156,11 +177,42 @@ export default function TransportManagement() {
             case 'routes':
                 return <RoutesTab data={routes} onAdd={() => { setEditingRoute(null); setIsRouteFormOpen(true); }} onEdit={r => { setEditingRoute(r); setIsRouteFormOpen(true); }} onDelete={id => handleDelete('routes', id)} />;
             case 'allocations':
-                return <AllocationsTab data={allocations} onAdd={() => setIsAllocationFormOpen(true)} onDelete={id => handleDelete('allocations', id)} />;
+                return <AllocationsTab data={allocations} onAdd={() => setIsAllocationFormOpen(true)} onDelete={id => handleDelete('allocations', id)} onImport={handleImportAllocations} importFile={importFile} setImportFile={setImportFile} />;
             default:
                 return null;
         }
     };
+
+    if (!isAdmin) {
+        return (
+            <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg space-y-6">
+                <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100">My Transport</h1>
+                <div className="bg-gray-50 dark:bg-gray-900/50 p-6 rounded-xl border border-gray-100 dark:border-gray-700">
+                    <h2 className="text-xl font-semibold mb-4">Allocation</h2>
+                    {myAllocation ? (
+                        <div className="space-y-2 text-sm">
+                            <div><strong>Route:</strong> {myAllocation.route?.routeName}</div>
+                            <div><strong>Stop:</strong> {myAllocation.stop}</div>
+                            <div><strong>Fees:</strong> {myAllocation.feesStatus}</div>
+                        </div>
+                    ) : (
+                        <p className="text-gray-500">No allocation found.</p>
+                    )}
+                </div>
+
+                <div className="bg-white dark:bg-gray-900 p-6 rounded-xl border border-gray-100 dark:border-gray-700">
+                    <h2 className="text-xl font-semibold mb-4">Routes</h2>
+                    <Table headers={['Route Name', 'Stops', 'Assigned Vehicle']} data={routes} renderRow={r => (
+                        <tr key={r._id} className="border-b dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                            <td className="p-3">{r.routeName}</td>
+                            <td className="p-3 text-xs">{r.stops.join(', ')}</td>
+                            <td className="p-3">{r.vehicle?.vehicleNumber || 'N/A'}</td>
+                        </tr>
+                    )} />
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg">
@@ -171,6 +223,9 @@ export default function TransportManagement() {
                     <TabButton active={activeTab === 'routes'} onClick={() => setActiveTab('routes')}><Map className="mr-2" size={16} />Routes</TabButton>
                     <TabButton active={activeTab === 'allocations'} onClick={() => setActiveTab('allocations')}><UserPlus className="mr-2" size={16} />Student Allocation</TabButton>
                 </nav>
+            </div>
+            <div className="flex justify-end mt-4">
+                <button onClick={() => window.open('/api/transport/allocations/export', '_blank')} className="px-4 py-2 bg-primary-600 text-white rounded-md text-sm font-semibold">Export Allocations</button>
             </div>
             <div className="mt-6">{renderContent()}</div>
 
@@ -219,9 +274,19 @@ const RoutesTab = ({ data, onAdd, onEdit, onDelete }) => (
     </div>
 );
 
-const AllocationsTab = ({ data, onAdd, onDelete }) => (
+const AllocationsTab = ({ data, onAdd, onDelete, onImport, importFile, setImportFile }) => (
     <div>
-        <div className="flex justify-between items-center mb-4"><h2 className="text-xl font-semibold">Student Allocations</h2><button onClick={onAdd} className="flex items-center text-sm px-3 py-1.5 bg-primary-600 text-white rounded-md"><Plus size={16} className="mr-1"/>New Allocation</button></div>
+        <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold">Student Allocations</h2>
+            <div className="flex flex-wrap gap-2">
+                <label className="px-3 py-1.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md text-sm cursor-pointer">
+                    <input type="file" accept=".csv,.xlsx" className="hidden" onChange={(e) => setImportFile(e.target.files?.[0] || null)} />
+                    {importFile ? importFile.name : 'Import CSV/XLSX'}
+                </label>
+                <button onClick={onImport} className="flex items-center text-sm px-3 py-1.5 bg-emerald-600 text-white rounded-md">Upload</button>
+                <button onClick={onAdd} className="flex items-center text-sm px-3 py-1.5 bg-primary-600 text-white rounded-md"><Plus size={16} className="mr-1"/>New Allocation</button>
+            </div>
+        </div>
         <Table headers={['Student', 'Stream', 'Route', 'Stop', 'Fees', 'Actions']} data={data} renderRow={a => (
             <tr key={a._id} className="border-b dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700/50">
                 <td className="p-3">{a.student?.firstName} {a.student?.lastName}</td><td className="p-3">{a.student?.stream}</td><td className="p-3">{a.route?.routeName}</td><td className="p-3">{a.stop}</td>

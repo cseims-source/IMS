@@ -8,6 +8,8 @@ export default function UserApproval() {
     const [pendingUsers, setPendingUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState({}); // e.g. { 'userId': 'approve'/'deny' }
+    const [roleUpdating, setRoleUpdating] = useState({});
+    const [selectedRoles, setSelectedRoles] = useState({});
     const [error, setError] = useState('');
     const { api } = useAuth();
 
@@ -17,6 +19,10 @@ export default function UserApproval() {
             setError('');
             const data = await api('/api/users/pending');
             setPendingUsers(data);
+            setSelectedRoles(data.reduce((acc, user) => {
+                acc[user._id] = user.role || 'Student';
+                return acc;
+            }, {}));
         } catch (err) {
             setError('Failed to fetch pending users. Please try again.');
             console.error(err);
@@ -33,6 +39,13 @@ export default function UserApproval() {
         setActionLoading(prev => ({ ...prev, [userId]: action }));
         try {
             if (action === 'approve') {
+                const desiredRole = selectedRoles[userId];
+                if (desiredRole) {
+                    await api(`/api/users/${userId}/role`, {
+                        method: 'PUT',
+                        body: JSON.stringify({ role: desiredRole })
+                    });
+                }
                 await api(`/api/users/${userId}/approve`, { method: 'PUT' });
             } else if (action === 'deny') {
                 await api(`/api/users/${userId}/deny`, { method: 'DELETE' });
@@ -63,6 +76,22 @@ export default function UserApproval() {
     const roleColor = {
         Student: 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300',
         Teacher: 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300',
+        Admin: 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300',
+    };
+
+    const handleRoleChange = async (userId, newRole) => {
+        setSelectedRoles(prev => ({ ...prev, [userId]: newRole }));
+        setRoleUpdating(prev => ({ ...prev, [userId]: true }));
+        try {
+            await api(`/api/users/${userId}/role`, {
+                method: 'PUT',
+                body: JSON.stringify({ role: newRole })
+            });
+        } catch (err) {
+            alert('Failed to update role.');
+        } finally {
+            setRoleUpdating(prev => ({ ...prev, [userId]: false }));
+        }
     };
 
     return (
@@ -112,9 +141,21 @@ export default function UserApproval() {
                                     <td className="p-4">{user.name}</td>
                                     <td className="p-4">{user.email}</td>
                                     <td className="p-4">
-                                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${roleColor[user.role]}`}>
-                                            {user.role}
-                                        </span>
+                                        <div className="flex items-center gap-3">
+                                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${roleColor[selectedRoles[user._id]] || roleColor.Student}`}>
+                                                {selectedRoles[user._id] || user.role}
+                                            </span>
+                                            <select
+                                                value={selectedRoles[user._id] || user.role}
+                                                onChange={(e) => handleRoleChange(user._id, e.target.value)}
+                                                disabled={!!roleUpdating[user._id] || !!actionLoading[user._id]}
+                                                className="text-xs px-2 py-1 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+                                            >
+                                                <option value="Student">Student</option>
+                                                <option value="Teacher">Teacher</option>
+                                                <option value="Admin">Admin</option>
+                                            </select>
+                                        </div>
                                     </td>
                                     <td className="p-4 text-sm text-gray-600 dark:text-gray-400">{formatDateTime(user.createdAt)}</td>
                                     <td className="p-4 flex justify-center gap-2">
